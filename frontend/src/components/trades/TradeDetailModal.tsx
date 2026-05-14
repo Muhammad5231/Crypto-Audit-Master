@@ -38,10 +38,13 @@ export interface Trade {
   totalFees: string
   gstOnFees: string
   tds: string
-  baseTax: string
+  baseTax?: string
+  baseCryptoTax?: string
+  tax?: string
   cess: string
   totalDirectTax: string
-  netProfit: string
+  netProfit?: string
+  netProfitInHand?: string
   finalNetProfit: string
 }
 
@@ -89,6 +92,10 @@ function SectionHeader({
 
 export function TradeDetailModal({ open, onOpenChange, trade }: TradeDetailModalProps) {
   if (!trade) return null
+
+  const baseTaxValue = trade.baseCryptoTax ?? trade.tax ?? trade.baseTax ?? '0'
+  const netProfitValue = trade.netProfitInHand ?? trade.netProfit ?? '0'
+  const totalTaxValue = trade.totalDirectTax ?? (trade as any).totalTax ?? '0'
 
   const grossVal = parseFloat(trade.grossProfit) || 0
   const netVal = parseFloat(trade.netProfit) || 0
@@ -213,7 +220,7 @@ export function TradeDetailModal({ open, onOpenChange, trade }: TradeDetailModal
               title="Tax Computation"
             />
             <div className="rounded-xl bg-violet-500/5 border border-violet-500/10 p-3 space-y-2">
-              <MetricItem label="Base Tax (30% of profit)" value={formatINR(trade.baseTax)} className="text-violet-400" />
+              <MetricItem label="Base Tax (30% of profit)" value={formatINR(baseTaxValue)} className="text-violet-400" />
               {(trade.cess !== undefined) && (
                 <MetricItem label="Cess (4% of base tax)" value={formatINR(trade.cess)} className="text-violet-400" />
               )}
@@ -221,7 +228,7 @@ export function TradeDetailModal({ open, onOpenChange, trade }: TradeDetailModal
               <Separator className="bg-violet-500/10" />
               <MetricItem
                 label="Total Direct Tax"
-                value={formatINR(trade.totalDirectTax)}
+                value={formatINR(totalTaxValue)}
                 className="text-violet-400 font-semibold"
               />
             </div>
@@ -241,15 +248,14 @@ export function TradeDetailModal({ open, onOpenChange, trade }: TradeDetailModal
                   <BadgeIndianRupee className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">Net Profit (after fees)</span>
                 </div>
-                <span className={`text-sm font-bold font-mono ${getValueColor(trade.netProfit)}`}>
-                  {formatINR(trade.netProfit)}
+                <span className={`text-sm font-bold font-mono ${getValueColor(netProfitValue)}`}>
+                  {formatINR(netProfitValue)}
                 </span>
               </div>
-              <div className={`rounded-xl border-2 p-4 ${
-                finalVal >= 0
-                  ? 'bg-emerald-500/5 border-emerald-500/20'
-                  : 'bg-red-500/5 border-red-500/20'
-              }`}>
+              <div className={`rounded-xl border-2 p-4 ${finalVal >= 0
+                ? 'bg-emerald-500/5 border-emerald-500/20'
+                : 'bg-red-500/5 border-red-500/20'
+                }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {finalVal >= 0 ? (

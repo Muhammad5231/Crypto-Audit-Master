@@ -52,6 +52,22 @@ import { useAppStore } from '@/store/appStore'
 
 const PAGE_SIZE = 10
 
+function getBaseTax(trade: any) {
+  return trade.baseCryptoTax ?? trade.tax ?? trade.baseTax ?? '0'
+}
+
+function getNetProfit(trade: any) {
+  return trade.netProfitInHand ?? trade.netProfit ?? '0'
+}
+
+function getTotalTax(trade: any) {
+  return trade.totalDirectTax ?? trade.totalTax ?? '0'
+}
+
+function getFees(trade: any) {
+  return trade.totalFees ?? trade.fees ?? '0'
+}
+
 type SortField = 'sellDate' | 'grossProfit' | 'pair' | 'finalNetProfit' | 'netProfit'
 type SortOrder = 'asc' | 'desc'
 
@@ -228,13 +244,13 @@ export function RealizedTradesView() {
         buyValue: acc.buyValue + (parseFloat(t.buyValue) || 0),
         sellValue: acc.sellValue + (parseFloat(t.sellValue) || 0),
         grossProfit: acc.grossProfit + (parseFloat(t.grossProfit) || 0),
-        totalFees: acc.totalFees + (parseFloat(t.totalFees) || 0),
+        totalFees: acc.totalFees + (parseFloat(getFees(t)) || 0),
         gstOnFees: acc.gstOnFees + (parseFloat(t.gstOnFees) || 0),
         tds: acc.tds + (parseFloat(t.tds) || 0),
-        baseTax: acc.baseTax + (parseFloat(t.baseTax) || 0),
+        baseTax: acc.baseTax + (parseFloat(getBaseTax(t)) || 0),
         cess: acc.cess + (parseFloat(t.cess) || 0),
-        totalDirectTax: acc.totalDirectTax + (parseFloat(t.totalDirectTax) || 0),
-        netProfit: acc.netProfit + (parseFloat(t.netProfit) || 0),
+        totalDirectTax: acc.totalDirectTax + (parseFloat(getTotalTax(t)) || 0),
+        netProfit: acc.netProfit + (parseFloat(getNetProfit(t)) || 0),
         finalNetProfit: acc.finalNetProfit + (parseFloat(t.finalNetProfit) || 0),
       }),
       {
@@ -512,14 +528,16 @@ export function RealizedTradesView() {
                         <TableCell className={`text-right font-mono text-sm font-semibold ${getValueColor(trade.grossProfit)}`}>
                           {formatINR(trade.grossProfit)}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm text-red-400">{formatINR(trade.totalFees ?? trade.fees ?? 0)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm text-red-400">{formatINR(getFees(trade))}</TableCell>
                         <TableCell className="text-right font-mono text-sm text-red-400">{formatINR(trade.gstOnFees)}</TableCell>
                         <TableCell className="text-right font-mono text-sm text-amber-500">{formatINR(trade.tds)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm text-red-400">{formatINR(trade.baseTax)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm text-red-400">
+                          {formatINR(getBaseTax(trade))}
+                        </TableCell>
                         <TableCell className="text-right font-mono text-sm text-red-400">{formatINR(trade.cess ?? '0')}</TableCell>
-                        <TableCell className="text-right font-mono text-sm text-red-400 font-semibold">{formatINR(trade.totalDirectTax ?? trade.totalTax ?? 0)}</TableCell>
-                        <TableCell className={`text-right font-mono text-sm font-semibold ${getValueColor(trade.netProfitInHand ?? trade.netProfit ?? 0)}`}>
-                          {formatINR(trade.netProfitInHand ?? trade.netProfit ?? 0)}
+                        <TableCell className="text-right font-mono text-sm text-red-400 font-semibold">{formatINR(getTotalTax(trade))}</TableCell>
+                        <TableCell className={`text-right font-mono text-sm font-semibold ${getValueColor(getNetProfit(trade))}`}>
+                          {formatINR(getNetProfit(trade))}
                         </TableCell>
                         <TableCell className={`text-right font-mono text-sm font-bold ${getValueColor(trade.finalNetProfit)}`}>
                           {formatINR(trade.finalNetProfit)}
