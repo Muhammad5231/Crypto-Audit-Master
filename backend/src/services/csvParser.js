@@ -17,7 +17,17 @@ const aliases = {
   side: ["Side", "Type", "Order Side"],
   price: ["Exec.Price", "Price", "Executed Price", "Avg Price"],
   fee: ["Fees", "Fees paid", "Commission", "Fee", "Trading Fees"],
-  tds: ["TDS", "Tax Deducted"],
+  tds: ["TDS", "Tax Deducted", "Tax Deducted at Source"],
+  tax: [
+    "Tax",
+    "Crypto Tax",
+    "Direct Tax",
+    "Total Tax",
+    "Total Direct Tax",
+    "Income Tax",
+    "Tax Amount",
+    "Base Crypto Tax",
+  ],
   status: ["Status", "Order Status"],
   orderValue: ["Order Value", "Value", "Total"],
 };
@@ -47,7 +57,11 @@ function dec(value) {
       .replace(/[,₹$]/g, "")
       .trim();
 
-    return clean ? new Decimal(clean).toString() : "0";
+    if (!clean || clean === "-" || clean.toLowerCase() === "na" || clean.toLowerCase() === "n/a") {
+      return "0";
+    }
+
+    return new Decimal(clean).toString();
   } catch {
     return "0";
   }
@@ -62,10 +76,6 @@ function parseFlexibleDate(value) {
 
   raw = raw.replace(/^"|"$/g, "").trim();
 
-  // Delta format:
-  // 2026-05-08 00:48:35.412884+05:30 IST Asia/Kolkata
-  // Convert to:
-  // 2026-05-08T00:48:35.412+05:30
   const deltaMatch = raw.match(
     /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})(?:\.(\d+))?([+-]\d{2}:\d{2})/
   );
@@ -73,7 +83,9 @@ function parseFlexibleDate(value) {
   if (deltaMatch) {
     const datePart = deltaMatch[1];
     const timePart = deltaMatch[2];
-    const msPart = deltaMatch[3] ? deltaMatch[3].slice(0, 3).padEnd(3, "0") : "000";
+    const msPart = deltaMatch[3]
+      ? deltaMatch[3].slice(0, 3).padEnd(3, "0")
+      : "000";
     const offsetPart = deltaMatch[4];
 
     const iso = `${datePart}T${timePart}.${msPart}${offsetPart}`;
@@ -82,11 +94,9 @@ function parseFlexibleDate(value) {
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
-  // Remove text timezone suffix like IST Asia/Kolkata
   raw = raw.replace(/\s+(IST|UTC|GMT)\s+.+$/i, "");
   raw = raw.replace(/\s+Asia\/Kolkata$/i, "");
 
-  // Unix timestamp support
   if (/^\d{10}$/.test(raw)) {
     const d = new Date(Number(raw) * 1000);
     return Number.isNaN(d.getTime()) ? null : d;
@@ -97,13 +107,11 @@ function parseFlexibleDate(value) {
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
-  // Native parse
   const nativeDate = new Date(raw);
   if (!Number.isNaN(nativeDate.getTime())) {
     return nativeDate;
   }
 
-  // DD-MM-YYYY or DD/MM/YYYY
   let match = raw.match(
     /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
   );
@@ -123,7 +131,6 @@ function parseFlexibleDate(value) {
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
-  // YYYY-MM-DD or YYYY/MM/DD
   match = raw.match(
     /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
   );
@@ -164,7 +171,6 @@ function parseCsv(buffer, exchangeName = "Unknown") {
 
     const status = String(pick(row, aliases.status) || "executed").toLowerCase();
 
-    // Delta CSV me status "closed" hota hai, so closed ko valid maanna hai
     if (/cancel|reject|fail|pending/.test(status)) {
       filteredByStatus++;
       return;
@@ -207,6 +213,7 @@ function parseCsv(buffer, exchangeName = "Unknown") {
       price,
       fee: dec(pick(row, aliases.fee)),
       tds: dec(pick(row, aliases.tds)),
+      tax: dec(pick(row, aliases.tax)),
       status,
       orderValue: dec(pick(row, aliases.orderValue)),
       executedAt,

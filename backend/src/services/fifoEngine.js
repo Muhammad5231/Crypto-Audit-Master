@@ -19,15 +19,16 @@ function normalizeTrade(trade) {
     price: String(plain.price || plain.execPrice || "0"),
     fee: String(plain.fee || plain.fees || "0"),
     tds: String(plain.tds || "0"),
+    tax: String(plain.tax || plain.totalTax || plain.totalDirectTax || "0"),
     exchangeName: String(plain.exchangeName || "Default"),
     executedAt: plain.executedAt ? new Date(plain.executedAt) : new Date(),
     quantityOriginal: String(plain.quantity || plain.qty || "0"),
   };
 }
 
-function splitFee(totalFee, matchedQty, totalQty) {
-  if (D(totalFee).lte(0) || D(totalQty).lte(0)) return new Decimal(0);
-  return D(totalFee).mul(matchedQty).div(totalQty);
+function splitAmount(totalAmount, matchedQty, totalQty) {
+  if (D(totalAmount).lte(0) || D(totalQty).lte(0)) return new Decimal(0);
+  return D(totalAmount).mul(matchedQty).div(totalQty);
 }
 
 function calculateLine({
@@ -36,6 +37,7 @@ function calculateLine({
   qty,
   buyFeePart,
   sellFeePart,
+  sellTaxPart,
   fallbackBuyPercent,
   fallbackSellPercent,
 }) {
@@ -50,10 +52,9 @@ function calculateLine({
   const finalSellFee = D(sellFeePart).gt(0) ? D(sellFeePart) : calculatedSellFee;
 
   const totalFees = finalBuyFee.plus(finalSellFee);
-
   const gstOnFees = totalFees.mul(0.18);
 
-  const sellTdsPart = splitFee(
+  const sellTdsPart = splitAmount(
     sell.tds || 0,
     qty,
     sell.quantityOriginal || sell.quantity
@@ -61,9 +62,21 @@ function calculateLine({
 
   const tds = sellTdsPart.gt(0) ? sellTdsPart : sellValue.mul(0.01);
 
-  const baseCryptoTax = grossProfit.gt(0) ? grossProfit.mul(0.3) : new Decimal(0);
-  const cess = baseCryptoTax.gt(0) ? baseCryptoTax.mul(0.04) : new Decimal(0);
-  const totalDirectTax = baseCryptoTax.plus(cess);
+  let baseCryptoTax = new Decimal(0);
+  let cess = new Decimal(0);
+  let totalDirectTax = new Decimal(0);
+
+  if (grossProfit.gt(0)) {
+    if (D(sellTaxPart).gt(0)) {
+      totalDirectTax = D(sellTaxPart);
+      baseCryptoTax = totalDirectTax.div(1.04);
+      cess = totalDirectTax.minus(baseCryptoTax);
+    } else {
+      baseCryptoTax = grossProfit.mul(0.3);
+      cess = baseCryptoTax.mul(0.04);
+      totalDirectTax = baseCryptoTax.plus(cess);
+    }
+  }
 
   const netProfitInHand = grossProfit
     .minus(totalFees)
@@ -133,14 +146,20 @@ function runFifo(inputTrades, settingsMap = {}) {
           sellFeePercent: "0.1",
         };
 
-      const buyFeePart = splitFee(
+      const buyFeePart = splitAmount(
         buyLot.fee,
         matchedQty,
         buyLot.quantityOriginal || buyLot.quantity
       );
 
-      const sellFeePart = splitFee(
+      const sellFeePart = splitAmount(
         trade.fee,
+        matchedQty,
+        trade.quantityOriginal || trade.quantity
+      );
+
+      const sellTaxPart = splitAmount(
+        trade.tax,
         matchedQty,
         trade.quantityOriginal || trade.quantity
       );
@@ -151,6 +170,7 @@ function runFifo(inputTrades, settingsMap = {}) {
         qty: matchedQty,
         buyFeePart,
         sellFeePart,
+        sellTaxPart,
         fallbackBuyPercent: setting.buyFeePercent,
         fallbackSellPercent: setting.sellFeePercent,
       });
@@ -171,15 +191,25 @@ function runFifo(inputTrades, settingsMap = {}) {
         grossProfit: calc.grossProfit.toString(),
 
         totalFees: calc.totalFees.toString(),
+        fees: calc.totalFees.toString(),
+
         gstOnFees: calc.gstOnFees.toString(),
+        gst: calc.gstOnFees.toString(),
+
         tds: calc.tds.toString(),
 
         baseCryptoTax: calc.baseCryptoTax.toString(),
+        tax: calc.baseCryptoTax.toString(),
+
         cess: calc.cess.toString(),
         healthEducationCess: calc.cess.toString(),
+
         totalDirectTax: calc.totalDirectTax.toString(),
+        totalTax: calc.totalDirectTax.toString(),
 
         netProfitInHand: calc.netProfitInHand.toString(),
+        netProfit: calc.netProfitInHand.toString(),
+
         finalNetProfit: calc.finalNetProfit.toString(),
       });
 
@@ -252,6 +282,12 @@ function runFifo(inputTrades, settingsMap = {}) {
       finalNetProfit: "0",
     }
   );
+
+  summary.fees = summary.totalFees;
+  summary.gst = summary.gstOnFees;
+  summary.tax = summary.baseCryptoTax;
+  summary.totalTax = summary.totalDirectTax;
+  summary.netProfit = summary.netProfitInHand;
 
   summary.totalTrades = realizedTrades.length;
   summary.openHoldings = openHoldings.length;

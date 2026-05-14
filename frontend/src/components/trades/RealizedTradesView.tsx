@@ -467,12 +467,12 @@ export function RealizedTradesView() {
                     >
                       <div className="flex items-center justify-end gap-1">Gross Profit<ArrowUpDown className="size-3" /></div>
                     </TableHead>
-                    <TableHead className="text-right">Total Fees</TableHead>
+                    <TableHead className="text-right">Fees</TableHead>
                     <TableHead className="text-right">GST on Fees</TableHead>
                     <TableHead className="text-right">TDS</TableHead>
                     <TableHead className="text-right">Tax</TableHead>
                     <TableHead className="text-right">Cess (4%)</TableHead>
-                    <TableHead className="text-right">Total Direct Tax</TableHead>
+                    <TableHead className="text-right">Total Tax</TableHead>
                     <TableHead
                       className="text-right cursor-pointer select-none"
                       onClick={() => handleSortToggle('netProfit')}
@@ -512,14 +512,14 @@ export function RealizedTradesView() {
                         <TableCell className={`text-right font-mono text-sm font-semibold ${getValueColor(trade.grossProfit)}`}>
                           {formatINR(trade.grossProfit)}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm text-red-400">{formatINR(trade.totalFees)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm text-red-400">{formatINR(trade.totalFees ?? trade.fees ?? 0)}</TableCell>
                         <TableCell className="text-right font-mono text-sm text-red-400">{formatINR(trade.gstOnFees)}</TableCell>
                         <TableCell className="text-right font-mono text-sm text-amber-500">{formatINR(trade.tds)}</TableCell>
                         <TableCell className="text-right font-mono text-sm text-red-400">{formatINR(trade.baseTax)}</TableCell>
                         <TableCell className="text-right font-mono text-sm text-red-400">{formatINR(trade.cess ?? '0')}</TableCell>
-                        <TableCell className="text-right font-mono text-sm text-red-400 font-semibold">{formatINR(trade.totalDirectTax)}</TableCell>
-                        <TableCell className={`text-right font-mono text-sm font-semibold ${getValueColor(trade.netProfit)}`}>
-                          {formatINR(trade.netProfit)}
+                        <TableCell className="text-right font-mono text-sm text-red-400 font-semibold">{formatINR(trade.totalDirectTax ?? trade.totalTax ?? 0)}</TableCell>
+                        <TableCell className={`text-right font-mono text-sm font-semibold ${getValueColor(trade.netProfitInHand ?? trade.netProfit ?? 0)}`}>
+                          {formatINR(trade.netProfitInHand ?? trade.netProfit ?? 0)}
                         </TableCell>
                         <TableCell className={`text-right font-mono text-sm font-bold ${getValueColor(trade.finalNetProfit)}`}>
                           {formatINR(trade.finalNetProfit)}
