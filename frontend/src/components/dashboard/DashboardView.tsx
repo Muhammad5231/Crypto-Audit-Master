@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
+  ArrowRight,
   BarChart3,
   FileSpreadsheet,
   IndianRupee,
   Loader2,
   PieChart as PieIcon,
-  RefreshCw,
   ShieldCheck,
   TrendingUp,
   Upload,
@@ -16,8 +14,6 @@ import {
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   Pie,
@@ -35,7 +31,7 @@ import { useAppStore } from "@/store/appStore";
 import { reportApi, uploadApi } from "@/lib/api";
 
 function n(value: any) {
-  const num = Number(value || 0);
+  const num = Number(value ?? 0);
   return Number.isFinite(num) ? num : 0;
 }
 
@@ -58,6 +54,18 @@ function getWorkspaceId(workspace: any) {
   return workspace?.id || workspace?._id || "";
 }
 
+function shortDate(value: any) {
+  if (!value || value === "Start" || value === "End") return value || "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+
 function MetricCard({
   title,
   value,
@@ -71,30 +79,39 @@ function MetricCard({
   tone?: "profit" | "loss" | "tax" | "default";
   sub?: string;
 }) {
-  const color =
+  const style =
     tone === "profit"
-      ? "from-emerald-500/20 to-teal-500/5 text-emerald-500"
+      ? "bg-teal-500/10 text-teal-400"
       : tone === "loss"
-      ? "from-red-500/20 to-orange-500/5 text-red-500"
-      : tone === "tax"
-      ? "from-orange-500/20 to-yellow-500/5 text-orange-500"
-      : "from-sky-500/20 to-cyan-500/5 text-sky-500";
+        ? "bg-red-500/10 text-red-400"
+        : tone === "tax"
+          ? "bg-orange-500/10 text-orange-400"
+          : "bg-sky-500/10 text-sky-400";
 
   return (
-    <Card className="rounded-3xl border-border/50 bg-card/80 backdrop-blur-xl shadow-sm">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <Card className="rounded-2xl border-border/50 bg-card/70 shadow-sm backdrop-blur-xl">
+      <CardContent className="px-3 py-2.5">
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${style}`}
+          >
+            <Icon className="h-4.5 w-4.5" />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/90">
               {title}
             </p>
-            <h3 className="mt-2 text-2xl font-black tracking-tight">{value}</h3>
-            {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
-          </div>
-          <div
-            className={`h-12 w-12 rounded-2xl bg-gradient-to-br ${color} flex items-center justify-center`}
-          >
-            <Icon className="h-5 w-5" />
+
+            <h3 className="mt-1 truncate text-[18px] font-black leading-none tracking-tight text-foreground">
+              {value}
+            </h3>
+
+            {sub && (
+              <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                {sub}
+              </p>
+            )}
           </div>
         </div>
       </CardContent>
@@ -109,7 +126,6 @@ export function DashboardView() {
   const workspaceId = getWorkspaceId(activeWorkspace);
 
   const [loading, setLoading] = useState(false);
-  const [processing, setProcessing] = useState(false);
   const [analytics, setAnalytics] = useState<any>(null);
   const [uploads, setUploads] = useState<any[]>([]);
 
@@ -117,6 +133,7 @@ export function DashboardView() {
     if (!workspaceId) return;
 
     setLoading(true);
+
     try {
       const [analyticsRes, uploadRes] = await Promise.all([
         reportApi.getAnalytics(workspaceId),
@@ -139,104 +156,104 @@ export function DashboardView() {
   }, [loadDashboard]);
 
   const summary = analytics?.summary || {};
-  const realizedTrades = analytics?.realizedTrades || [];
-  const openHoldings = analytics?.openHoldings || [];
-  const warnings = analytics?.warnings || [];
+  const realizedTrades = Array.isArray(analytics?.realizedTrades)
+    ? analytics.realizedTrades
+    : [];
+  const openHoldings = Array.isArray(analytics?.openHoldings)
+    ? analytics.openHoldings
+    : [];
+  const warnings = Array.isArray(analytics?.warnings) ? analytics.warnings : [];
 
   const totals = {
-    grossProfit: n(summary.grossProfit || summary.totalGrossProfit),
-    finalNetProfit: n(summary.finalNetProfit || summary.totalFinalNetProfit),
-    netProfitInHand: n(summary.netProfitInHand || summary.totalNetProfit),
+    grossProfit: n(summary.grossProfit ?? summary.totalGrossProfit),
+    finalNetProfit: n(summary.finalNetProfit ?? summary.totalFinalNetProfit),
     totalFees: n(summary.totalFees),
-    gst: n(summary.gstOnFees || summary.totalGstOnFees),
-    tds: n(summary.tds || summary.totalTds),
+    gst: n(summary.gstOnFees ?? summary.totalGstOnFees),
+    tds: n(summary.tds ?? summary.totalTds),
     tax: n(summary.totalDirectTax),
-    buyValue: n(summary.buyValue || summary.totalBuyValue),
-    sellValue: n(summary.sellValue || summary.totalSellValue),
+    baseTax: n(summary.baseCryptoTax ?? summary.totalBaseTax),
+    cess: n(summary.cess ?? summary.totalCess),
+    buyValue: n(summary.buyValue ?? summary.totalBuyValue),
+    sellValue: n(summary.sellValue ?? summary.totalSellValue),
     realizedCount: realizedTrades.length,
     holdingsCount: openHoldings.length,
   };
 
-  const dailyProfit = useMemo(() => {
+  const uploadTrades = uploads.reduce((sum, file) => sum + n(file.parsedCount), 0);
+
+  const profitOverTime = useMemo(() => {
     const map: Record<string, { date: string; profit: number; trades: number }> = {};
 
-    realizedTrades.forEach((t: any) => {
-      const rawDate = t.sellDate || t.createdAt || t.buyDate;
-      const date = rawDate
-        ? new Date(rawDate).toISOString().slice(0, 10)
-        : "Unknown";
+    realizedTrades.forEach((trade: any) => {
+      const rawDate = trade.sellDate || trade.buyDate || trade.createdAt;
+      const dateObj = rawDate ? new Date(rawDate) : null;
 
-      map[date] ||= { date, profit: 0, trades: 0 };
-      map[date].profit += n(t.finalNetProfit);
-      map[date].trades += 1;
+      if (!dateObj || Number.isNaN(dateObj.getTime())) return;
+
+      const key = dateObj.toISOString().slice(0, 10);
+
+      map[key] ||= {
+        date: key,
+        profit: 0,
+        trades: 0,
+      };
+
+      map[key].profit += n(trade.finalNetProfit ?? trade.grossProfit);
+      map[key].trades += 1;
     });
 
-    const arr = Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
+    const data = Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
 
-    if (arr.length === 1) {
-      const only = arr[0];
+    if (data.length === 1) {
       return [
         { date: "Start", profit: 0, trades: 0 },
-        only,
-        { date: "End", profit: only.profit, trades: only.trades },
+        data[0],
+        { date: "End", profit: data[0].profit, trades: data[0].trades },
       ];
     }
 
-    return arr;
+    return data;
   }, [realizedTrades]);
 
   const pairPerformance = useMemo(() => {
     const map: Record<string, { pair: string; profit: number; trades: number }> = {};
 
-    realizedTrades.forEach((t: any) => {
-      const pair = t.pair || "UNKNOWN";
-      map[pair] ||= { pair, profit: 0, trades: 0 };
-      map[pair].profit += n(t.finalNetProfit);
+    realizedTrades.forEach((trade: any) => {
+      const pair = String(trade.pair || "UNKNOWN").toUpperCase();
+
+      map[pair] ||= {
+        pair,
+        profit: 0,
+        trades: 0,
+      };
+
+      map[pair].profit += n(trade.finalNetProfit ?? trade.grossProfit);
       map[pair].trades += 1;
     });
 
     return Object.values(map)
       .sort((a, b) => Math.abs(b.profit) - Math.abs(a.profit))
-      .slice(0, 8);
+      .slice(0, 5);
   }, [realizedTrades]);
 
   const taxData = useMemo(
-    () => [
-      { name: "Direct Tax", value: totals.tax },
-      { name: "TDS", value: totals.tds },
-      { name: "GST Fees", value: totals.gst },
-      { name: "Fees", value: totals.totalFees },
-    ].filter((x) => x.value > 0),
-    [totals.tax, totals.tds, totals.gst, totals.totalFees]
+    () =>
+      [
+        { name: "Base Crypto Tax (30%)", value: totals.baseTax || Math.max(totals.tax - totals.cess, 0) },
+        { name: "TDS (1%)", value: totals.tds },
+        { name: "GST on Fees (18%)", value: totals.gst },
+        { name: "Cess (4%)", value: totals.cess },
+      ].filter((item) => item.value > 0),
+    [totals.baseTax, totals.tax, totals.cess, totals.tds, totals.gst]
   );
 
-  const uploadTrades = uploads.reduce((sum, file) => sum + n(file.parsedCount), 0);
-
-  const handleProcess = async () => {
-    if (!workspaceId) return;
-
-    setProcessing(true);
-    try {
-      const res = await reportApi.process(workspaceId);
-      toast.success("Processing complete", {
-        description: `${res.realizedCount || 0} realized trades, ${
-          res.holdingsCount || 0
-        } open holdings.`,
-      });
-      await loadDashboard();
-    } catch (err: any) {
-      toast.error("Processing failed", {
-        description: err?.message || "Try upload CSV again",
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
+  const recentTrades = realizedTrades.slice(0, 5);
+  const lastUpload = uploads[0]?.createdAt || uploads[0]?.uploadedAt || uploads[0]?.updatedAt;
 
   if (!workspaceId) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center">
-        <Card className="max-w-xl w-full rounded-3xl">
+      <div className="flex min-h-[70vh] items-center justify-center">
+        <Card className="w-full max-w-xl rounded-3xl">
           <CardContent className="p-8 text-center">
             <Wallet className="mx-auto h-12 w-12 text-teal-500" />
             <h2 className="mt-4 text-2xl font-black">No workspace selected</h2>
@@ -252,243 +269,391 @@ export function DashboardView() {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center">
+        <Loader2 className="h-9 w-9 animate-spin text-teal-500" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 pb-8">
-      <section className="relative overflow-hidden rounded-[2rem] border border-border/50 bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 p-6 text-white shadow-2xl">
-        <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-teal-400/20 blur-3xl" />
-        <div className="absolute bottom-0 left-20 h-40 w-40 rounded-full bg-orange-400/10 blur-3xl" />
+    <div className="space-y-3 pb-6">
+      {/* Key metric cards */}
+      <section className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          title="Final Net Profit"
+          value={money(totals.finalNetProfit)}
+          icon={TrendingUp}
+          tone={totals.finalNetProfit >= 0 ? "profit" : "loss"}
+          sub="After tax adjustment"
+        />
 
-        <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-teal-200">
-              Crypto Audit Master
-            </p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight lg:text-5xl">
-              {activeWorkspace?.name || "Dashboard"}
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm text-slate-300">
-              FIFO profit, fees, GST, TDS and Indian crypto tax summary in one
-              clean dashboard.
-            </p>
-          </div>
+        <MetricCard
+          title="Gross Profit"
+          value={money(totals.grossProfit)}
+          icon={IndianRupee}
+          tone={totals.grossProfit >= 0 ? "profit" : "loss"}
+          sub="Sell - Buy value"
+        />
 
-          <div className="flex flex-wrap gap-3">
-            <Button
-              variant="secondary"
-              className="rounded-2xl"
-              onClick={() => setCurrentView("upload")}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload CSV
-            </Button>
+        <MetricCard
+          title="Direct Tax"
+          value={money(totals.tax)}
+          icon={ShieldCheck}
+          tone="tax"
+          sub="30% + 4% cess"
+        />
 
-            <Button
-              className="rounded-2xl bg-teal-500 text-slate-950 hover:bg-teal-400"
-              onClick={handleProcess}
-              disabled={processing}
-            >
-              {processing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              Process Trades
-            </Button>
-          </div>
-        </div>
+        <MetricCard
+          title="Open Holdings"
+          value={String(totals.holdingsCount)}
+          icon={Wallet}
+          sub={`${totals.realizedCount} realized`}
+        />
+
+        <MetricCard
+          title="CSV Trades"
+          value={String(uploadTrades)}
+          icon={FileSpreadsheet}
+          sub={`${uploads.length} uploaded`}
+        />
+
+        <MetricCard
+          title="Total Fees"
+          value={money(totals.totalFees)}
+          icon={PieIcon}
+          tone="tax"
+          sub="CSV or fallback"
+        />
+
+        <MetricCard
+          title="GST on Fees"
+          value={money(totals.gst)}
+          icon={BarChart3}
+          tone="tax"
+          sub="18% on fees"
+        />
+
+        <MetricCard
+          title="TDS"
+          value={money(totals.tds)}
+          icon={TrendingUp}
+          tone="tax"
+          sub="Withheld tax"
+        />
       </section>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
-        </div>
-      ) : (
-        <>
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              title="Final Net Profit"
-              value={money(totals.finalNetProfit)}
-              icon={TrendingUp}
-              tone={totals.finalNetProfit >= 0 ? "profit" : "loss"}
-              sub="After tax adjustment"
-            />
+      {/* Image-like dashboard grid */}
+      <section className="grid gap-3 xl:grid-cols-12">
+        <Card className="rounded-2xl border-border/50 bg-card/70 shadow-sm backdrop-blur-xl xl:col-span-7">
+          <CardHeader className="flex flex-row items-start justify-between p-4 pb-1">
+            <div>
+              <CardTitle className="text-base">Profit Over Time</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Showing realized profit over selected period
+              </p>
+            </div>
+            <div className="rounded-xl border bg-background/40 px-3 py-1.5 text-xs text-muted-foreground">
+              Daily
+            </div>
+          </CardHeader>
 
-            <MetricCard
-              title="Gross Profit"
-              value={money(totals.grossProfit)}
-              icon={IndianRupee}
-              tone={totals.grossProfit >= 0 ? "profit" : "loss"}
-              sub="Sell value - buy value"
-            />
+          <CardContent className="h-[275px] p-4 pt-2">
+            {profitOverTime.length ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={profitOverTime}>
+                  <defs>
+                    <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.5} />
+                      <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.03} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={shortDate}
+                  />
+                  <YAxis tickFormatter={compact} tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    formatter={(value: any) => [money(value), "Profit"]}
+                    labelFormatter={shortDate}
+                    contentStyle={{
+                      borderRadius: 14,
+                      border: "1px solid rgba(148,163,184,.25)",
+                      background: "rgba(2,6,23,.94)",
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="profit"
+                    stroke="#14b8a6"
+                    strokeWidth={3}
+                    fill="url(#profitGradient)"
+                    dot={{ r: 3, fill: "#14b8a6" }}
+                    activeDot={{ r: 6 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyDashboardText onUpload={() => setCurrentView("upload")} />
+            )}
+          </CardContent>
+        </Card>
 
-            <MetricCard
-              title="Direct Tax"
-              value={money(totals.tax)}
-              icon={ShieldCheck}
-              tone="tax"
-              sub="30% tax + 4% cess"
-            />
+        <Card className="rounded-2xl border-border/50 bg-card/70 shadow-sm backdrop-blur-xl xl:col-span-5">
+          <CardHeader className="flex flex-row items-start justify-between p-4 pb-1">
+            <div>
+              <CardTitle className="text-base">Profit by Trading Pair</CardTitle>
+            </div>
+            <div className="rounded-xl border bg-background/40 px-3 py-1.5 text-xs text-muted-foreground">
+              By Profit
+            </div>
+          </CardHeader>
 
-            <MetricCard
-              title="Open Holdings"
-              value={String(totals.holdingsCount)}
-              icon={Wallet}
-              sub={`${totals.realizedCount} realized trades`}
-            />
-          </section>
-
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <MetricCard
-              title="CSV Trades"
-              value={String(uploadTrades)}
-              icon={FileSpreadsheet}
-              sub={`${uploads.length} uploaded file(s)`}
-            />
-            <MetricCard
-              title="Total Fees"
-              value={money(totals.totalFees)}
-              icon={ArrowDownRight}
-              tone="tax"
-              sub="CSV fee or fallback %"
-            />
-            <MetricCard
-              title="GST on Fees"
-              value={money(totals.gst)}
-              icon={PieIcon}
-              tone="tax"
-              sub="18% only on fees"
-            />
-            <MetricCard
-              title="TDS"
-              value={money(totals.tds)}
-              icon={ArrowUpRight}
-              tone="tax"
-              sub="Withheld amount"
-            />
-          </section>
-
-          <section className="grid gap-5 xl:grid-cols-3">
-            <Card className="xl:col-span-2 rounded-3xl border-border/50 bg-card/80 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-teal-500" />
-                  Profit Over Time
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="h-[340px]">
-                {dailyProfit.length ? (
+          <CardContent className="h-[275px] p-4 pt-1">
+            {pairPerformance.length ? (
+              <div className="grid h-full grid-cols-12 items-center gap-3">
+                <div className="col-span-5 h-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={dailyProfit}>
-                      <defs>
-                        <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.45} />
-                          <stop offset="95%" stopColor="#14b8a6" stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                      <YAxis tickFormatter={compact} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(v: any) => money(v)} />
-                      <Area
-                        type="monotone"
+                    <PieChart>
+                      <Pie
+                        data={pairPerformance}
+                        innerRadius={48}
+                        outerRadius={82}
+                        paddingAngle={3}
                         dataKey="profit"
-                        stroke="#14b8a6"
-                        strokeWidth={3}
-                        fill="url(#profitGradient)"
-                      />
-                    </AreaChart>
+                      >
+                        {pairPerformance.map((_, index) => (
+                          <Cell
+                            key={index}
+                            fill={["#14b8a6", "#8b5cf6", "#f97316", "#facc15", "#64748b"][index % 5]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: any) => money(value)} />
+                    </PieChart>
                   </ResponsiveContainer>
-                ) : (
-                  <EmptyDashboardText onUpload={() => setCurrentView("upload")} />
-                )}
-              </CardContent>
-            </Card>
+                </div>
 
-            <Card className="rounded-3xl border-border/50 bg-card/80 shadow-sm">
-              <CardHeader>
-                <CardTitle>Tax & Cost Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[340px]">
-                {taxData.length ? (
+                <div className="col-span-7 space-y-3">
+                  {pairPerformance.map((item, index) => {
+                    const total = pairPerformance.reduce((s, p) => s + Math.abs(p.profit), 0);
+                    const percent = total ? (Math.abs(item.profit) / total) * 100 : 0;
+
+                    return (
+                      <div key={item.pair} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{
+                              backgroundColor:
+                                ["#14b8a6", "#8b5cf6", "#f97316", "#facc15", "#64748b"][index % 5],
+                            }}
+                          />
+                          <span>{item.pair}</span>
+                        </div>
+                        <span className="text-muted-foreground">{money(item.profit)}</span>
+                        <span>{percent.toFixed(1)}%</span>
+                      </div>
+                    );
+                  })}
+
+                  <button
+                    onClick={() => setCurrentView("analytics")}
+                    className="ml-auto flex items-center gap-2 pt-2 text-xs font-medium text-teal-400 hover:text-teal-300"
+                  >
+                    View full analytics
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <EmptyDashboardText onUpload={() => setCurrentView("upload")} />
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-3 xl:grid-cols-12">
+        <Card className="rounded-2xl border-border/50 bg-card/70 shadow-sm backdrop-blur-xl xl:col-span-7">
+          <CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
+            <CardTitle className="text-base">Recent Realized Trades</CardTitle>
+            <button
+              onClick={() => setCurrentView("realized-trades")}
+              className="text-xs font-medium text-teal-400 hover:text-teal-300"
+            >
+              View All
+            </button>
+          </CardHeader>
+
+          <CardContent className="p-4 pt-0">
+            {recentTrades.length ? (
+              <div className="overflow-hidden rounded-2xl">
+                <table className="w-full text-xs">
+                  <thead className="text-muted-foreground">
+                    <tr>
+                      <th className="py-2 text-left font-medium">Date</th>
+                      <th className="py-2 text-left font-medium">Pair</th>
+                      <th className="py-2 text-left font-medium">Side</th>
+                      <th className="py-2 text-right font-medium">Qty</th>
+                      <th className="py-2 text-right font-medium">Buy Price</th>
+                      <th className="py-2 text-right font-medium">Sell Price</th>
+                      <th className="py-2 text-right font-medium">Profit</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {recentTrades.map((trade: any, index: number) => {
+                      const profit = n(trade.finalNetProfit ?? trade.grossProfit);
+
+                      return (
+                        <tr key={trade.id || trade._id || index} className="border-t border-border/40">
+                          <td className="py-2.5 text-muted-foreground">
+                            {shortDate(trade.sellDate || trade.buyDate)}
+                          </td>
+                          <td className="py-2.5 font-medium">{trade.pair || "UNKNOWN"}</td>
+                          <td className="py-2.5">
+                            <span className="rounded-md bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-400">
+                              SELL
+                            </span>
+                          </td>
+                          <td className="py-2.5 text-right">
+                            {n(trade.matchedQty ?? trade.quantity).toLocaleString("en-IN", {
+                              maximumFractionDigits: 8,
+                            })}
+                          </td>
+                          <td className="py-2.5 text-right">{money(trade.buyPrice)}</td>
+                          <td className="py-2.5 text-right">{money(trade.sellPrice)}</td>
+                          <td className={`py-2.5 text-right font-bold ${profit >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {money(profit)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                <button
+                  onClick={() => setCurrentView("realized-trades")}
+                  className="ml-auto mt-3 flex items-center gap-2 text-xs font-medium text-teal-400 hover:text-teal-300"
+                >
+                  View all realized trades
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <EmptyDashboardText onUpload={() => setCurrentView("upload")} />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border-border/50 bg-card/70 shadow-sm backdrop-blur-xl xl:col-span-5">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-base">Tax Breakdown (Est.)</CardTitle>
+          </CardHeader>
+
+          <CardContent className="h-[255px] p-4 pt-0">
+            {taxData.length ? (
+              <div className="grid h-full grid-cols-12 items-center gap-3">
+                <div className="col-span-5 h-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={taxData}
-                        innerRadius={70}
-                        outerRadius={110}
-                        paddingAngle={4}
+                        innerRadius={48}
+                        outerRadius={82}
+                        paddingAngle={3}
                         dataKey="value"
                       >
-                        {taxData.map((_, i) => (
+                        {taxData.map((_, index) => (
                           <Cell
-                            key={i}
-                            fill={["#14b8a6", "#f97316", "#38bdf8", "#a78bfa"][i % 4]}
+                            key={index}
+                            fill={["#14b8a6", "#8b5cf6", "#f97316", "#facc15"][index % 4]}
                           />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(v: any) => money(v)} />
+                      <Tooltip formatter={(value: any) => money(value)} />
                     </PieChart>
                   </ResponsiveContainer>
-                ) : (
-                  <EmptyDashboardText onUpload={() => setCurrentView("upload")} />
-                )}
-              </CardContent>
-            </Card>
-          </section>
+                </div>
 
-          <section className="grid gap-5 xl:grid-cols-3">
-            <Card className="xl:col-span-2 rounded-3xl border-border/50 bg-card/80 shadow-sm">
-              <CardHeader>
-                <CardTitle>Pair Performance</CardTitle>
-              </CardHeader>
-              <CardContent className="h-[320px]">
-                {pairPerformance.length ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={pairPerformance}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                      <XAxis dataKey="pair" tick={{ fontSize: 11 }} />
-                      <YAxis tickFormatter={compact} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(v: any) => money(v)} />
-                      <Bar dataKey="profit" radius={[12, 12, 0, 0]} fill="#14b8a6" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyDashboardText onUpload={() => setCurrentView("upload")} />
-                )}
-              </CardContent>
-            </Card>
+                <div className="col-span-7 space-y-3">
+                  {taxData.map((item, index) => {
+                    const total = taxData.reduce((s, x) => s + x.value, 0);
+                    const percent = total ? (item.value / total) * 100 : 0;
 
-            <Card className="rounded-3xl border-border/50 bg-card/80 shadow-sm">
-              <CardHeader>
-                <CardTitle>Audit Status</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <StatusRow label="Uploaded Files" value={uploads.length} />
-                <StatusRow label="Parsed Trades" value={uploadTrades} />
-                <StatusRow label="Realized Trades" value={totals.realizedCount} />
-                <StatusRow label="Open Holdings" value={totals.holdingsCount} />
-                <StatusRow label="Warnings" value={warnings.length} />
+                    return (
+                      <div key={item.name} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{
+                              backgroundColor:
+                                ["#14b8a6", "#8b5cf6", "#f97316", "#facc15"][index % 4],
+                            }}
+                          />
+                          <span>{item.name}</span>
+                        </div>
+                        <span className="text-muted-foreground">{money(item.value)}</span>
+                        <span>{percent.toFixed(1)}%</span>
+                      </div>
+                    );
+                  })}
 
-                {uploads.length > 0 && totals.realizedCount === 0 && (
-                  <div className="rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4 text-sm">
-                    CSV upload ho gayi hai. Ab <b>Process Trades</b> click karo
-                    ya Upload Center se process karo.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </section>
-        </>
-      )}
+                  <button
+                    onClick={() => setCurrentView("tax-summary")}
+                    className="ml-auto flex items-center gap-2 pt-2 text-xs font-medium text-teal-400 hover:text-teal-300"
+                  >
+                    View full tax report
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <EmptyDashboardText onUpload={() => setCurrentView("upload")} />
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card className="rounded-2xl border-border/50 bg-card/70 shadow-sm backdrop-blur-xl">
+        <CardHeader className="p-4 pb-0">
+          <CardTitle className="text-base">Workspace Summary</CardTitle>
+        </CardHeader>
+
+        <CardContent className="p-4">
+          <div className="grid gap-3 md:grid-cols-4">
+            <SummaryItem icon={FileSpreadsheet} label="Total CSV Files" value={`${uploads.length} Files`} />
+            <SummaryItem icon={BarChart3} label="Total Trades" value={uploadTrades.toLocaleString("en-IN")} />
+            <SummaryItem icon={TrendingUp} label="Last Data Update" value={lastUpload ? shortDate(lastUpload) : "-"} />
+            <SummaryItem icon={ShieldCheck} label="Workspace" value={warnings.length ? `${warnings.length} Warnings` : "Isolated & Secure"} />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function StatusRow({ label, value }: { label: string; value: any }) {
+function SummaryItem({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: any;
+  label: string;
+  value: string;
+}) {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-muted/40 px-4 py-3">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="font-bold">{value}</span>
+    <div className="flex items-center gap-4 border-r border-border/50 last:border-r-0 max-md:border-r-0">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-teal-500/10 text-teal-400">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="mt-1 text-sm font-bold">{value}</p>
+      </div>
     </div>
   );
 }
@@ -496,12 +661,12 @@ function StatusRow({ label, value }: { label: string; value: any }) {
 function EmptyDashboardText({ onUpload }: { onUpload: () => void }) {
   return (
     <div className="flex h-full flex-col items-center justify-center text-center">
-      <Upload className="h-10 w-10 text-muted-foreground" />
-      <h3 className="mt-3 font-bold">No processed data</h3>
-      <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-        CSV upload karo, then Process Trades click karo.
+      <Upload className="h-9 w-9 text-muted-foreground" />
+      <h3 className="mt-3 text-sm font-bold">No processed data</h3>
+      <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+        Upload Center me CSV upload karo.
       </p>
-      <Button className="mt-4 rounded-2xl" onClick={onUpload}>
+      <Button size="sm" className="mt-3 rounded-xl" onClick={onUpload}>
         Upload CSV
       </Button>
     </div>
