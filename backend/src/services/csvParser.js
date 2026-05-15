@@ -240,8 +240,8 @@ function parseCsv(buffer, exchangeName = "Unknown") {
       sideRaw.includes("SELL") || sideRaw === "S"
         ? "SELL"
         : sideRaw.includes("BUY") || sideRaw === "B"
-        ? "BUY"
-        : "";
+          ? "BUY"
+          : "";
 
     const pair = normalizePair(pick(row, aliases.pair));
 
@@ -251,14 +251,19 @@ function parseCsv(buffer, exchangeName = "Unknown") {
     const timeValue = pick(row, aliases.time);
     const executedAt = parseFlexibleDate(timeValue);
 
-    // Open orders with zero executed quantity must be ignored.
-    // Cancelled orders are allowed only if Total Quantity - Remaining Quantity > 0.
-    if (
-      /open|pending|cancel|reject|fail/.test(status) &&
-      D(quantity).lte(0)
-    ) {
-      filteredByStatus++;
-      return;
+    // IMPORTANT:
+    // If CSV has Status column, only completed trade rows should be counted.
+    // For Order History CSV, only "filled" rows are real executed trades.
+    // open / cancelled / rejected / pending rows must be ignored completely.
+    const hasStatusColumn = String(pick(row, aliases.status) || "").trim() !== "";
+
+    if (hasStatusColumn) {
+      const validExecutedStatuses = ["filled", "executed", "closed", "completed"];
+
+      if (!validExecutedStatuses.includes(status)) {
+        filteredByStatus++;
+        return;
+      }
     }
 
     if (!side || !pair || D(quantity).lte(0) || D(price).lte(0)) {
