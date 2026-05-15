@@ -12,12 +12,27 @@ const aliases = {
     "Trade Time",
     "Order Time",
   ],
+
   pair: ["Contract", "Symbol", "Pair", "Market", "Asset"],
+
   qty: ["Qty", "Quantity", "Filled Qty", "Amount", "Size"],
+
+  totalQty: ["Total Quantity", "Order Quantity", "Qty"],
+
+  remainingQty: ["Remaining Quantity", "Remaining Qty", "Pending Quantity"],
+
   side: ["Side", "Type", "Order Side"],
+
   price: ["Exec.Price", "Price", "Executed Price", "Avg Price"],
-  fee: ["Fees", "Fees paid", "Commission", "Fee", "Trading Fees"],
-  tds: ["TDS", "Tax Deducted", "Tax Deducted at Source"],
+
+  avgPrice: ["Avg Price", "Average Price"],
+
+  pricePerUnit: ["Price Per Unit", "Limit Price", "Price"],
+
+  fee: ["Fees", "Fees paid", "Commission", "Fee", "Trading Fees", "Fee Amount"],
+
+  tds: ["TDS", "Tax Deducted", "Tax Deducted at Source", "Total Tds INR"],
+
   tax: [
     "Tax",
     "Crypto Tax",
@@ -28,7 +43,9 @@ const aliases = {
     "Tax Amount",
     "Base Crypto Tax",
   ],
+
   status: ["Status", "Order Status"],
+
   orderValue: ["Order Value", "Value", "Total"],
 };
 
@@ -57,7 +74,14 @@ function dec(value) {
       .replace(/[,₹$]/g, "")
       .trim();
 
-    if (!clean || clean === "-" || clean.toLowerCase() === "na" || clean.toLowerCase() === "n/a") {
+    if (
+      !clean ||
+      clean === "-" ||
+      clean.toLowerCase() === "na" ||
+      clean.toLowerCase() === "n/a" ||
+      clean.toLowerCase() === "null" ||
+      clean.toLowerCase() === "undefined"
+    ) {
       return "0";
     }
 
@@ -65,6 +89,28 @@ function dec(value) {
   } catch {
     return "0";
   }
+}
+
+function D(value) {
+  try {
+    return new Decimal(value || 0);
+  } catch {
+    return new Decimal(0);
+  }
+}
+
+function normalizePair(value) {
+  let pair = String(value || "").trim().toUpperCase();
+
+  // Example: I-BTC_INR => BTC_INR
+  pair = pair.replace(/^I-/, "");
+
+  // Example: BTCINR => BTC_INR
+  if (!pair.includes("_") && pair.endsWith("INR")) {
+    pair = pair.replace(/INR$/, "_INR");
+  }
+
+  return pair;
 }
 
 function parseFlexibleDate(value) {
@@ -76,6 +122,18 @@ function parseFlexibleDate(value) {
 
   raw = raw.replace(/^"|"$/g, "").trim();
 
+  // Example: 2026-05-14 17:22:29 UTC
+  const utcMatch = raw.match(
+    /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+UTC$/i
+  );
+
+  if (utcMatch) {
+    const d = new Date(`${utcMatch[1]}T${utcMatch[2]}Z`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  // Delta format:
+  // 2026-05-08 00:48:35.412884+05:30 IST Asia/Kolkata
   const deltaMatch = raw.match(
     /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})(?:\.(\d+))?([+-]\d{2}:\d{2})/
   );
@@ -112,43 +170,46 @@ function parseFlexibleDate(value) {
     return nativeDate;
   }
 
-  let match = raw.match(
-    /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-  );
-
-  if (match) {
-    const day = Number(match[1]);
-    const month = Number(match[2]) - 1;
-    let year = Number(match[3]);
-
-    if (year < 100) year += 2000;
-
-    const hour = Number(match[4] || 0);
-    const minute = Number(match[5] || 0);
-    const second = Number(match[6] || 0);
-
-    const d = new Date(year, month, day, hour, minute, second);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-
-  match = raw.match(
-    /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-  );
-
-  if (match) {
-    const year = Number(match[1]);
-    const month = Number(match[2]) - 1;
-    const day = Number(match[3]);
-
-    const hour = Number(match[4] || 0);
-    const minute = Number(match[5] || 0);
-    const second = Number(match[6] || 0);
-
-    const d = new Date(year, month, day, hour, minute, second);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-
   return null;
+}
+
+function getQuantity(row) {
+  const normalQty = dec(pick(row, aliases.qty));
+
+  if (D(normalQty).gt(0)) {
+    return normalQty;
+  }
+
+  const totalQty = dec(pick(row, aliases.totalQty));
+  const remainingQty = dec(pick(row, aliases.remainingQty));
+
+  // For order-history CSV:
+  // executed quantity = Total Quantity - Remaining Quantity
+  if (D(totalQty).gt(0)) {
+    const filledQty = D(totalQty).minus(remainingQty);
+
+    if (filledQty.gt(0)) {
+      return filledQty.toString();
+    }
+  }
+
+  return "0";
+}
+
+function getPrice(row) {
+  const avgPrice = dec(pick(row, aliases.avgPrice));
+
+  if (D(avgPrice).gt(0)) {
+    return avgPrice;
+  }
+
+  const normalPrice = dec(pick(row, aliases.price));
+
+  if (D(normalPrice).gt(0)) {
+    return normalPrice;
+  }
+
+  return dec(pick(row, aliases.pricePerUnit));
 }
 
 function parseCsv(buffer, exchangeName = "Unknown") {
@@ -169,12 +230,9 @@ function parseCsv(buffer, exchangeName = "Unknown") {
   parsed.data.forEach((row, idx) => {
     const rowNumber = idx + 2;
 
-    const status = String(pick(row, aliases.status) || "executed").toLowerCase();
-
-    if (/cancel|reject|fail|pending/.test(status)) {
-      filteredByStatus++;
-      return;
-    }
+    const status = String(pick(row, aliases.status) || "executed")
+      .trim()
+      .toLowerCase();
 
     const sideRaw = String(pick(row, aliases.side)).toUpperCase();
 
@@ -185,23 +243,37 @@ function parseCsv(buffer, exchangeName = "Unknown") {
         ? "BUY"
         : "";
 
-    const pair = String(pick(row, aliases.pair)).trim().toUpperCase();
+    const pair = normalizePair(pick(row, aliases.pair));
 
-    const quantity = dec(pick(row, aliases.qty));
-    const price = dec(pick(row, aliases.price));
+    const quantity = getQuantity(row);
+    const price = getPrice(row);
 
     const timeValue = pick(row, aliases.time);
     const executedAt = parseFlexibleDate(timeValue);
 
-    if (!side || !pair || new Decimal(quantity).lte(0) || new Decimal(price).lte(0)) {
+    // Open orders with zero executed quantity must be ignored.
+    // Cancelled orders are allowed only if Total Quantity - Remaining Quantity > 0.
+    if (
+      /open|pending|cancel|reject|fail/.test(status) &&
+      D(quantity).lte(0)
+    ) {
+      filteredByStatus++;
+      return;
+    }
+
+    if (!side || !pair || D(quantity).lte(0) || D(price).lte(0)) {
       skippedCount++;
-      warnings.push(`Row ${rowNumber}: missing/invalid side, pair, qty, or price`);
+      warnings.push(
+        `Row ${rowNumber}: missing/invalid side, pair, executed qty, or price`
+      );
       return;
     }
 
     if (!executedAt) {
       skippedCount++;
-      warnings.push(`Row ${rowNumber}: invalid date/time "${timeValue}". Row skipped.`);
+      warnings.push(
+        `Row ${rowNumber}: invalid date/time "${timeValue}". Row skipped.`
+      );
       return;
     }
 

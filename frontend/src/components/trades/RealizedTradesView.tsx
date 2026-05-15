@@ -68,6 +68,10 @@ function getFees(trade: any) {
   return trade.totalFees ?? trade.fees ?? '0'
 }
 
+function getExchangeName(trade: any) {
+  return trade.exchangeName || trade.exchange || trade.sourceExchange || 'Unknown'
+}
+
 type SortField = 'sellDate' | 'grossProfit' | 'pair' | 'finalNetProfit' | 'netProfit'
 type SortOrder = 'asc' | 'desc'
 
@@ -192,6 +196,7 @@ export function RealizedTradesView() {
       const q = searchQuery.toLowerCase().trim()
       result = result.filter((t) => {
         if (t.pair.toLowerCase().includes(q)) return true
+        if (getExchangeName(t).toLowerCase().includes(q)) return true
         if (formatDate(t.buyDate).toLowerCase().includes(q)) return true
         if (formatDate(t.sellDate).toLowerCase().includes(q)) return true
         if (formatINR(t.grossProfit).toLowerCase().includes(q)) return true
@@ -470,6 +475,7 @@ export function RealizedTradesView() {
                     <TableHead className="cursor-pointer select-none" onClick={() => handleSortToggle('pair')}>
                       <div className="flex items-center gap-1">Pair<ArrowUpDown className="size-3" /></div>
                     </TableHead>
+                    <TableHead>Exchange</TableHead>
                     <TableHead className="cursor-pointer select-none" onClick={() => handleSortToggle('sellDate')}>
                       <div className="flex items-center gap-1">Buy Date<ArrowUpDown className="size-3" /></div>
                     </TableHead>
@@ -514,6 +520,13 @@ export function RealizedTradesView() {
                             {trade.pair}
                           </Badge>
                         </TableCell>
+
+                        <TableCell>
+                          <Badge variant="outline" className="font-medium text-xs whitespace-nowrap">
+                            {getExchangeName(trade)}
+                          </Badge>
+                        </TableCell>
+
                         <TableCell className="py-2">
                           <div className="text-sm font-medium text-foreground">{formatDate(trade.buyDate)}</div>
                           <div className="text-[10px] text-muted-foreground">{formatTime(trade.buyDate)}</div>
@@ -551,7 +564,7 @@ export function RealizedTradesView() {
                     <TableCell className="font-bold text-foreground text-center" colSpan={2}>
                       Total ({filteredTrades.length})
                     </TableCell>
-                    <TableCell colSpan={3} />
+                    <TableCell colSpan={4} />
                     <TableCell className="text-right font-mono text-sm font-semibold text-muted-foreground">{formatINR(grandTotals.buyValue)}</TableCell>
                     <TableCell className="text-right font-mono text-sm font-semibold text-muted-foreground">{formatINR(grandTotals.sellValue)}</TableCell>
                     <TableCell className={`text-right font-mono text-sm font-bold ${getValueColor(grandTotals.grossProfit)}`}>{formatINR(grandTotals.grossProfit)}</TableCell>
@@ -619,7 +632,7 @@ function FilterControls({
       <div className="relative w-full sm:w-auto sm:min-w-[220px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by pair, date, or profit..."
+          placeholder="Search by pair, exchange, date, or profit..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-9 h-9 rounded-xl bg-muted/50 border-border/50 pr-8"
