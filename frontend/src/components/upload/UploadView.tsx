@@ -685,212 +685,204 @@ export function UploadView() {
                   </p>
                 </div>
               ) : (
-                <ScrollArea className="max-h-[420px] overflow-y-auto">
-                  <div className="space-y-2 pr-2">
-                    <AnimatePresence>
-                      {uploads.map((upload, index) => {
-                        const isPreviewOpen = expandedPreviewId === upload.id;
-                        const hasPreview =
-                          Array.isArray(upload.previewHeaders) &&
-                          upload.previewHeaders.length > 0 &&
-                          Array.isArray(upload.previewRows) &&
-                          upload.previewRows.length > 0;
+                <div className="space-y-2">
+                  <AnimatePresence>
+                    {uploads.map((upload, index) => {
+                      const isPreviewOpen = expandedPreviewId === upload.id;
+                      const hasPreview =
+                        Array.isArray(upload.previewHeaders) &&
+                        upload.previewHeaders.length > 0 &&
+                        Array.isArray(upload.previewRows) &&
+                        upload.previewRows.length > 0;
 
-                        return (
-                          <motion.div
-                            key={upload.id}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            transition={{ delay: index * 0.03 }}
-                            className="rounded-xl border border-border/40 hover:bg-muted/30 transition-colors group overflow-hidden"
-                          >
-                            <div className="flex items-center gap-3 p-3">
-                              {/* Icon */}
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted/60">
-                                {upload.warnings?.length > 0 ? (
-                                  <FileWarning className="h-5 w-5 text-orange-500" />
-                                ) : (
-                                  <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
-                                )}
+                      return (
+                        <motion.div
+                          key={upload.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          transition={{ delay: index * 0.03 }}
+                          className="rounded-xl border border-border/40 hover:bg-muted/30 transition-colors group overflow-hidden"
+                          style={{ maxWidth: "100%" }}
+                        >
+                          <div className="grid grid-cols-[40px_minmax(0,1fr)_auto_auto] items-center gap-3 p-3">
+                            {/* Icon */}
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted/60">
+                              {upload.warnings?.length > 0 ? (
+                                <FileWarning className="h-5 w-5 text-orange-500" />
+                              ) : (
+                                <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
+                              )}
+                            </div>
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-medium text-foreground truncate max-w-[200px] lg:max-w-none">
+                                  {upload.filename}
+                                </p>
+
+                                <Badge variant="outline" className="text-[10px] font-normal shrink-0">
+                                  {upload.exchangeName}
+                                </Badge>
                               </div>
 
-                              {/* Info */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="text-sm font-medium text-foreground truncate max-w-[200px] lg:max-w-none">
-                                    {upload.filename}
-                                  </p>
+                              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                  {upload.parsedCount} trades
+                                </span>
 
-                                  <Badge variant="outline" className="text-[10px] font-normal shrink-0">
-                                    {upload.exchangeName}
-                                  </Badge>
-                                </div>
-
-                                <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                                {upload.skippedCount > 0 && (
                                   <span className="flex items-center gap-1">
-                                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                                    {upload.parsedCount} trades
+                                    <AlertCircle className="h-3 w-3 text-orange-500" />
+                                    {upload.skippedCount} skipped
                                   </span>
+                                )}
 
-                                  {upload.skippedCount > 0 && (
-                                    <span className="flex items-center gap-1">
-                                      <AlertCircle className="h-3 w-3 text-orange-500" />
-                                      {upload.skippedCount} skipped
-                                    </span>
-                                  )}
+                                <span>
+                                  {formatRelativeTime(upload.uploadedAt || upload.createdAt || "")}
+                                </span>
 
-                                  <span>
-                                    {formatRelativeTime(upload.uploadedAt || upload.createdAt || "")}
+                                {hasPreview && (
+                                  <span className="hidden sm:inline">
+                                    Preview: {upload.previewRows?.length || 0} of{" "}
+                                    {upload.previewTotalRows || upload.previewRows?.length || 0} rows
                                   </span>
-
-                                  {hasPreview && (
-                                    <span className="hidden sm:inline">
-                                      Preview: {upload.previewRows?.length || 0} of{" "}
-                                      {upload.previewTotalRows || upload.previewRows?.length || 0} rows
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* File size */}
-                              <div className="hidden lg:block text-xs text-muted-foreground">
-                                {formatFileSize(upload.fileSize)}
-                              </div>
-
-                              <div className="flex items-center gap-1 shrink-0 self-start pt-0.5">
-                                {/* Preview Toggle */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-
-                                    if (!hasPreview) {
-                                      toast.info("Preview not available", {
-                                        description:
-                                          "Old uploaded CSV me preview data nahi hai. CSV delete karke dobara upload karo.",
-                                      });
-                                      return;
-                                    }
-
-                                    setExpandedPreviewId(isPreviewOpen ? null : upload.id);
-                                  }}
-                                  className={`
-      flex h-8 w-8 items-center justify-center rounded-lg transition-all
-      ${isPreviewOpen
-                                      ? "bg-teal-500/15 text-teal-500"
-                                      : "text-muted-foreground hover:text-teal-500 hover:bg-teal-500/10"
-                                    }
-    `}
-                                  title={isPreviewOpen ? "Collapse preview" : "Preview CSV"}
-                                >
-                                  {isPreviewOpen ? (
-                                    <PanelBottomClose className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </button>
-
-                                {/* Delete */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeleteTarget(upload);
-                                  }}
-                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all"
-                                  title="Delete file"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                                )}
                               </div>
                             </div>
 
-                            <AnimatePresence>
-                              {isPreviewOpen && hasPreview && (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: "auto", opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  className="border-t border-border/40 bg-background/40"
-                                >
-                                  <div className="p-3">
-                                    <div className="mb-2 flex items-center justify-between gap-2">
-                                      <p className="text-xs font-medium text-foreground">
-                                        CSV Preview
-                                      </p>
-                                      <p className="text-[11px] text-muted-foreground">
-                                        Showing first {upload.previewRows?.length || 0} rows
-                                      </p>
-                                    </div>
+                            {/* File size */}
+                            <div className="hidden lg:block text-xs text-muted-foreground whitespace-nowrap">
+                              {formatFileSize(upload.fileSize)}
+                            </div>
 
-                                    <div className="rounded-xl border bg-background overflow-hidden">
-                                      <div className="overflow-auto max-h-[520px] w-full">
-                                        <div className="min-w-max">
-                                          <table className="border-collapse text-xs">
-                                            <thead className="sticky top-0 z-20 bg-muted">
-                                              <tr>
-                                                {upload.previewHeaders?.map((header) => (
-                                                  <th
-                                                    key={header}
-                                                    className="
-                  px-3 py-2 text-left font-semibold text-muted-foreground
-                  border-b border-r last:border-r-0
-                  whitespace-nowrap bg-muted
-                "
-                                                  >
-                                                    {header}
-                                                  </th>
-                                                ))}
-                                              </tr>
-                                            </thead>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {/* Preview Toggle */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
 
-                                            <tbody>
-                                              {upload.previewRows?.map((row, rowIndex) => (
-                                                <tr
-                                                  key={rowIndex}
-                                                  className="border-b hover:bg-muted/30 transition-colors"
-                                                >
-                                                  {upload.previewHeaders?.map((header) => (
-                                                    <td
-                                                      key={`${rowIndex}-${header}`}
-                                                      className="
-                    px-3 py-2 border-r last:border-r-0
-                    whitespace-nowrap align-top
-                  "
-                                                      title={String(row?.[header] ?? "")}
-                                                    >
-                                                      <div className="max-w-[260px] truncate">
-                                                        {String(row?.[header] ?? "-")}
-                                                      </div>
-                                                    </td>
-                                                  ))}
-                                                </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      </div>
+                                  if (!hasPreview) {
+                                    toast.info("Preview not available", {
+                                      description:
+                                        "Old uploaded CSV me preview data nahi hai. CSV delete karke dobara upload karo.",
+                                    });
+                                    return;
+                                  }
 
-                                      <div className="border-t bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-                                        Showing {upload.previewRows?.length || 0} rows from uploaded CSV
-                                      </div>
-                                    </div>
+                                  setExpandedPreviewId(isPreviewOpen ? null : upload.id);
+                                }}
+                                className={`
+      flex h-8 w-8 items-center justify-center rounded-lg transition-all
+      ${isPreviewOpen
+                                    ? "bg-teal-500/15 text-teal-500"
+                                    : "text-muted-foreground hover:text-teal-500 hover:bg-teal-500/10"
+                                  }
+    `}
+                                title={isPreviewOpen ? "Collapse preview" : "Preview CSV"}
+                              >
+                                {isPreviewOpen ? (
+                                  <PanelBottomClose className="h-4 w-4" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </button>
 
-                                    <p className="mt-2 text-[11px] text-muted-foreground">
-                                      This is only a simple preview of uploaded CSV data. Full file is
-                                      processed by backend parser.
+                              {/* Delete */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget(upload);
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all"
+                                title="Delete file"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <AnimatePresence>
+                            {isPreviewOpen && hasPreview && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="border-t border-border/40 bg-background/40"
+                              >
+                                <div className="p-3">
+                                  <div className="mb-2 flex items-center justify-between gap-2">
+                                    <p className="text-xs font-medium text-foreground">
+                                      CSV Preview
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground">
+                                      Showing first {upload.previewRows?.length || 0} rows
                                     </p>
                                   </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
-                </ScrollArea>
+
+                                  <div className="rounded-xl border bg-background overflow-hidden max-w-full">
+                                    <div className="h-[360px] max-h-[360px] overflow-auto overscroll-contain">
+                                      <table className="w-max min-w-full border-collapse text-xs">
+                                        <thead className="sticky top-0 z-20 bg-muted">
+                                          <tr>
+                                            {upload.previewHeaders?.map((header) => (
+                                              <th
+                                                key={header}
+                                                className="px-3 py-2 text-left font-semibold text-muted-foreground border-b border-r last:border-r-0 whitespace-nowrap bg-muted"
+                                              >
+                                                {header}
+                                              </th>
+                                            ))}
+                                          </tr>
+                                        </thead>
+
+                                        <tbody>
+                                          {upload.previewRows?.map((row, rowIndex) => (
+                                            <tr
+                                              key={rowIndex}
+                                              className="border-b hover:bg-muted/30 transition-colors"
+                                            >
+                                              {upload.previewHeaders?.map((header) => (
+                                                <td
+                                                  key={`${rowIndex}-${header}`}
+                                                  className="px-3 py-2 border-r last:border-r-0 whitespace-nowrap align-top"
+                                                  title={String(row?.[header] ?? "")}
+                                                >
+                                                  <div className="max-w-[260px] truncate">
+                                                    {String(row?.[header] ?? "-")}
+                                                  </div>
+                                                </td>
+                                              ))}
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+
+                                    <div className="border-t bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+                                      Showing {upload.previewRows?.length || 0} of{" "}
+                                      {upload.previewTotalRows || upload.previewRows?.length || 0} rows.
+                                      Scroll inside the table to view more rows and columns.
+                                    </div>
+                                  </div>
+
+                                  <p className="mt-2 text-[11px] text-muted-foreground">
+                                    This is only a simple preview of uploaded CSV data. Full file is
+                                    processed by backend parser.
+                                  </p>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -1234,6 +1226,6 @@ export function UploadView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }
