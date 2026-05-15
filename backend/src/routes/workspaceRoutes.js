@@ -26,7 +26,7 @@ function buildCsvPreview(buffer) {
   const headers = parsed.meta?.fields || [];
 
   const rows = Array.isArray(parsed.data)
-    ? parsed.data.slice(0, 10).map((row) => {
+    ? parsed.data.slice(0, 500).map((row) => {
       const cleanRow = {};
 
       headers.forEach((header) => {

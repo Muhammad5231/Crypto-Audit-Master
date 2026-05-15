@@ -26,6 +26,7 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
+  PanelBottomClose,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -56,7 +57,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAppStore } from '@/store/appStore';
 import { uploadApi, manualTradeApi, reportApi } from '@/lib/api';
@@ -757,39 +758,52 @@ export function UploadView() {
                                 {formatFileSize(upload.fileSize)}
                               </div>
 
-                              {/* Preview */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
+                              <div className="flex items-center gap-1 shrink-0 self-start pt-0.5">
+                                {/* Preview Toggle */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
 
-                                  if (!hasPreview) {
-                                    toast.info("Preview not available", {
-                                      description: "Old uploaded CSV me preview data nahi hai. CSV delete karke dobara upload karo.",
-                                    });
-                                    return;
-                                  }
+                                    if (!hasPreview) {
+                                      toast.info("Preview not available", {
+                                        description:
+                                          "Old uploaded CSV me preview data nahi hai. CSV delete karke dobara upload karo.",
+                                      });
+                                      return;
+                                    }
 
-                                  setExpandedPreviewId(isPreviewOpen ? null : upload.id);
-                                }}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-teal-500 hover:bg-teal-500/10 transition-all"
-                                title={hasPreview ? "Preview CSV" : "Preview not available"}
-                              >
-                                {isPreviewOpen ? (
-                                  <ChevronUp className="h-4 w-4" />
-                                ) : (
-                                  <Eye className="h-4 w-4" />
-                                )}
-                              </button>
+                                    setExpandedPreviewId(isPreviewOpen ? null : upload.id);
+                                  }}
+                                  className={`
+      flex h-8 w-8 items-center justify-center rounded-lg transition-all
+      ${isPreviewOpen
+                                      ? "bg-teal-500/15 text-teal-500"
+                                      : "text-muted-foreground hover:text-teal-500 hover:bg-teal-500/10"
+                                    }
+    `}
+                                  title={isPreviewOpen ? "Collapse preview" : "Preview CSV"}
+                                >
+                                  {isPreviewOpen ? (
+                                    <PanelBottomClose className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
+                                </button>
 
-                              {/* Delete */}
-                              <button
-                                onClick={() => setDeleteTarget(upload)}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all lg:opacity-100"
-                                title="Delete file"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                                {/* Delete */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteTarget(upload);
+                                  }}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all"
+                                  title="Delete file"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
                             </div>
 
                             <AnimatePresence>
@@ -810,45 +824,58 @@ export function UploadView() {
                                       </p>
                                     </div>
 
-                                    <ScrollArea className="max-h-[300px] rounded-xl border">
-                                      <div className="min-w-max">
-                                        <table className="w-full text-xs">
-                                          <thead className="sticky top-0 bg-muted z-10">
-                                            <tr>
-                                              {upload.previewHeaders?.map((header) => (
-                                                <th
-                                                  key={header}
-                                                  className="px-3 py-2 text-left font-semibold text-muted-foreground border-r last:border-r-0 whitespace-nowrap"
-                                                >
-                                                  {header}
-                                                </th>
-                                              ))}
-                                            </tr>
-                                          </thead>
-
-                                          <tbody>
-                                            {upload.previewRows?.map((row, rowIndex) => (
-                                              <tr
-                                                key={rowIndex}
-                                                className="border-t hover:bg-muted/40"
-                                              >
+                                    <div className="rounded-xl border bg-background overflow-hidden">
+                                      <div className="overflow-auto max-h-[520px] w-full">
+                                        <div className="min-w-max">
+                                          <table className="border-collapse text-xs">
+                                            <thead className="sticky top-0 z-20 bg-muted">
+                                              <tr>
                                                 {upload.previewHeaders?.map((header) => (
-                                                  <td
-                                                    key={`${rowIndex}-${header}`}
-                                                    className="px-3 py-2 border-r last:border-r-0 whitespace-nowrap max-w-[220px] truncate"
-                                                    title={String(row?.[header] ?? "")}
+                                                  <th
+                                                    key={header}
+                                                    className="
+                  px-3 py-2 text-left font-semibold text-muted-foreground
+                  border-b border-r last:border-r-0
+                  whitespace-nowrap bg-muted
+                "
                                                   >
-                                                    {String(row?.[header] ?? "-")}
-                                                  </td>
+                                                    {header}
+                                                  </th>
                                                 ))}
                                               </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
+                                            </thead>
+
+                                            <tbody>
+                                              {upload.previewRows?.map((row, rowIndex) => (
+                                                <tr
+                                                  key={rowIndex}
+                                                  className="border-b hover:bg-muted/30 transition-colors"
+                                                >
+                                                  {upload.previewHeaders?.map((header) => (
+                                                    <td
+                                                      key={`${rowIndex}-${header}`}
+                                                      className="
+                    px-3 py-2 border-r last:border-r-0
+                    whitespace-nowrap align-top
+                  "
+                                                      title={String(row?.[header] ?? "")}
+                                                    >
+                                                      <div className="max-w-[260px] truncate">
+                                                        {String(row?.[header] ?? "-")}
+                                                      </div>
+                                                    </td>
+                                                  ))}
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
                                       </div>
 
-                                      <ScrollBar orientation="horizontal" />
-                                    </ScrollArea>
+                                      <div className="border-t bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+                                        Showing {upload.previewRows?.length || 0} rows from uploaded CSV
+                                      </div>
+                                    </div>
 
                                     <p className="mt-2 text-[11px] text-muted-foreground">
                                       This is only a simple preview of uploaded CSV data. Full file is
