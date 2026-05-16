@@ -100,6 +100,81 @@ function calculateLine({
   };
 }
 
+function normalizeOpenHoldings(holdings = []) {
+  const grouped = new Map();
+
+  for (const holding of holdings) {
+    const pair = String(holding?.pair || "").trim().toUpperCase();
+    const remainingQty = D(
+      holding?.remainingQty ??
+      holding?.quantity ??
+      0
+    );
+
+    if (!pair || remainingQty.lte(0)) continue;
+
+    const totalBuyValue = D(
+      holding?.totalBuyValue ??
+      holding?.investedValue ??
+      D(holding?.avgBuyPrice ?? holding?.averageBuyPrice ?? holding?.buyPrice ?? 0)
+        .mul(remainingQty)
+        .toString()
+    );
+
+    const group = grouped.get(pair) || {
+      pair,
+      remainingQty: new Decimal(0),
+      totalBuyValue: new Decimal(0),
+      sourceCount: 0,
+      exchangeCount: {},
+    };
+
+    group.remainingQty = group.remainingQty.plus(remainingQty);
+    group.totalBuyValue = group.totalBuyValue.plus(totalBuyValue);
+
+    const sourceCount =
+      Number(holding?.sourceCount) ||
+      (Array.isArray(holding?.sourceLots) ? holding.sourceLots.length : 0) ||
+      1;
+
+    group.sourceCount += sourceCount;
+
+    const exchangeName = String(
+      holding?.exchangeName ||
+      holding?.exchange ||
+      "Default"
+    ).trim() || "Default";
+
+    group.exchangeCount[exchangeName] =
+      (group.exchangeCount[exchangeName] || 0) + sourceCount;
+
+    grouped.set(pair, group);
+  }
+
+  return Array.from(grouped.values())
+    .map((group) => {
+      const avgBuyPrice = group.remainingQty.gt(0)
+        ? group.totalBuyValue.div(group.remainingQty)
+        : new Decimal(0);
+
+      const exchangeName =
+        Object.entries(group.exchangeCount).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+        "Default";
+
+      return {
+        pair: group.pair,
+        remainingQty: group.remainingQty.toString(),
+        avgBuyPrice: avgBuyPrice.toString(),
+        averageBuyPrice: avgBuyPrice.toString(),
+        totalBuyValue: group.totalBuyValue.toString(),
+        investedValue: group.totalBuyValue.toString(),
+        sourceCount: group.sourceCount,
+        exchangeName,
+      };
+    })
+    .sort((a, b) => D(b.totalBuyValue).minus(a.totalBuyValue).toNumber());
+}
+
 function runFifo(inputTrades, settingsMap = {}) {
   const trades = inputTrades
     .map(normalizeTrade)
@@ -228,14 +303,14 @@ function runFifo(inputTrades, settingsMap = {}) {
     }
   }
 
-  const openHoldings = [];
+  const openHoldingLots = [];
 
   for (const [pair, lots] of Object.entries(buyLots)) {
     for (const lot of lots) {
       if (D(lot.remaining).gt(0)) {
         const investedValue = D(lot.remaining).mul(lot.price);
 
-        openHoldings.push({
+        openHoldingLots.push({
           pair,
           exchangeName: lot.exchangeName,
           quantity: lot.remaining.toString(),
@@ -247,6 +322,8 @@ function runFifo(inputTrades, settingsMap = {}) {
       }
     }
   }
+
+  const openHoldings = normalizeOpenHoldings(openHoldingLots);
 
   const summary = realizedTrades.reduce(
     (acc, trade) => {
@@ -301,4 +378,4 @@ function runFifo(inputTrades, settingsMap = {}) {
   };
 }
 
-module.exports = { runFifo };
+module.exports = { runFifo, normalizeOpenHoldings };

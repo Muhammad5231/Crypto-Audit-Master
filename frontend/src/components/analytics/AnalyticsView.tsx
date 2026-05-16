@@ -238,7 +238,7 @@ function normalizeAnalytics(input: any): AnalyticsData {
     totalInvestedInHoldings: String(
       openHoldings.reduce(
         (sum: number, holding: any) =>
-          sum + safeNumber(holding.investedValue),
+          sum + safeNumber(holding.totalBuyValue ?? holding.investedValue),
         0
       )
     ),

@@ -1,16 +1,95 @@
 const router = require('express').Router();
 const Workspace = require('../models/Workspace'); const CsvFile = require('../models/CsvFile'); const Trade = require('../models/Trade'); const ExchangeSetting = require('../models/ExchangeSetting'); const Report = require('../models/Report'); const Note = require('../models/Note'); const ExportHistory = require('../models/ExportHistory');
-const { auth } = require('../middleware/auth'); const { workspaceAccess } = require('../middleware/workspaceAccess'); const { uploadMemory } = require('../middleware/upload'); const { asyncHandler } = require('../middleware/errorHandler'); const { sha256Buffer } = require('../utils/hash'); const { parseCsv } = require('../services/csvParser'); const { runFifo } = require('../services/fifoEngine'); const PDFDocument = require('pdfkit');
+const { auth } = require('../middleware/auth'); const { workspaceAccess } = require('../middleware/workspaceAccess'); const { uploadMemory } = require('../middleware/upload'); const { asyncHandler } = require('../middleware/errorHandler'); const { sha256Buffer } = require('../utils/hash'); const { parseCsv } = require('../services/csvParser'); const { runFifo, normalizeOpenHoldings } = require('../services/fifoEngine'); const PDFDocument = require('pdfkit');
 const Papa = require("papaparse");
 router.use(auth);
 const mapId = (o) => ({ ...o.toObject?.() || o, id: String(o._id || o.id) });
-router.get('/', asyncHandler(async (req, res) => { const q = { userId: req.user._id }; if (req.query.includeArchived !== 'true') q.isArchived = false; const workspaces = (await Workspace.find(q).sort({ lastOpenedAt: -1 })).map(mapId); res.json({ workspaces }); }));
-router.post('/', asyncHandler(async (req, res) => { const workspace = await Workspace.create({ userId: req.user._id, ...req.body }); await ExchangeSetting.create({ userId: req.user._id, workspaceId: workspace._id, exchangeName: 'Default' }); res.json({ workspace: mapId(workspace) }); }));
-router.get('/:id', workspaceAccess, (req, res) => res.json({ workspace: mapId(req.workspace) }));
-router.patch('/:id', workspaceAccess, asyncHandler(async (req, res) => { Object.assign(req.workspace, req.body); await req.workspace.save(); res.json({ workspace: mapId(req.workspace) }); }));
+function emptyWorkspaceCounts() {
+  return {
+    csvFiles: 0,
+    trades: 0,
+    reports: 0,
+    notes: 0,
+    exchangeSettings: 0,
+  };
+}
+
+function mapWorkspace(o, counts) {
+  const plain = mapId(o);
+
+  return {
+    ...plain,
+    _count: {
+      ...emptyWorkspaceCounts(),
+      ...(plain._count || {}),
+      ...(counts || {}),
+    },
+  };
+}
+
+function aggregateCountMap(rows) {
+  return rows.reduce((acc, row) => {
+    acc[String(row._id)] = Number(row.count || 0);
+    return acc;
+  }, {});
+}
+
+async function attachWorkspaceCounts(workspaces) {
+  const list = Array.isArray(workspaces) ? workspaces : [];
+  if (!list.length) return [];
+
+  const workspaceIds = list
+    .map((workspace) => workspace._id || workspace.id)
+    .filter(Boolean);
+
+  const [csvFiles, trades, reports, notes, exchangeSettings] = await Promise.all([
+    CsvFile.aggregate([
+      { $match: { workspaceId: { $in: workspaceIds } } },
+      { $group: { _id: '$workspaceId', count: { $sum: 1 } } },
+    ]),
+    Trade.aggregate([
+      { $match: { workspaceId: { $in: workspaceIds } } },
+      { $group: { _id: '$workspaceId', count: { $sum: 1 } } },
+    ]),
+    Report.aggregate([
+      { $match: { workspaceId: { $in: workspaceIds } } },
+      { $group: { _id: '$workspaceId', count: { $sum: 1 } } },
+    ]),
+    Note.aggregate([
+      { $match: { workspaceId: { $in: workspaceIds } } },
+      { $group: { _id: '$workspaceId', count: { $sum: 1 } } },
+    ]),
+    ExchangeSetting.aggregate([
+      { $match: { workspaceId: { $in: workspaceIds } } },
+      { $group: { _id: '$workspaceId', count: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const csvFilesByWorkspace = aggregateCountMap(csvFiles);
+  const tradesByWorkspace = aggregateCountMap(trades);
+  const reportsByWorkspace = aggregateCountMap(reports);
+  const notesByWorkspace = aggregateCountMap(notes);
+  const exchangeSettingsByWorkspace = aggregateCountMap(exchangeSettings);
+
+  return list.map((workspace) => {
+    const workspaceId = String(workspace._id || workspace.id);
+
+    return mapWorkspace(workspace, {
+      csvFiles: csvFilesByWorkspace[workspaceId] || 0,
+      trades: tradesByWorkspace[workspaceId] || 0,
+      reports: reportsByWorkspace[workspaceId] || 0,
+      notes: notesByWorkspace[workspaceId] || 0,
+      exchangeSettings: exchangeSettingsByWorkspace[workspaceId] || 0,
+    });
+  });
+}
+router.get('/', asyncHandler(async (req, res) => { const q = { userId: req.user._id }; if (req.query.includeArchived !== 'true') q.isArchived = false; const workspaces = await attachWorkspaceCounts(await Workspace.find(q).sort({ lastOpenedAt: -1 })); res.json({ workspaces }); }));
+router.post('/', asyncHandler(async (req, res) => { const workspace = await Workspace.create({ userId: req.user._id, ...req.body }); await ExchangeSetting.create({ userId: req.user._id, workspaceId: workspace._id, exchangeName: 'Default' }); res.json({ workspace: mapWorkspace(workspace, { exchangeSettings: 1 }) }); }));
+router.get('/:id', workspaceAccess, asyncHandler(async (req, res) => { const [workspace] = await attachWorkspaceCounts([req.workspace]); res.json({ workspace }); }));
+router.patch('/:id', workspaceAccess, asyncHandler(async (req, res) => { Object.assign(req.workspace, req.body); await req.workspace.save(); const [workspace] = await attachWorkspaceCounts([req.workspace]); res.json({ workspace }); }));
 router.delete('/:id', workspaceAccess, asyncHandler(async (req, res) => { await Promise.all([Workspace.deleteOne({ _id: req.workspace._id }), CsvFile.deleteMany({ workspaceId: req.workspace._id }), Trade.deleteMany({ workspaceId: req.workspace._id }), Report.deleteMany({ workspaceId: req.workspace._id }), ExchangeSetting.deleteMany({ workspaceId: req.workspace._id }), Note.deleteMany({ workspaceId: req.workspace._id })]); res.json({ success: true }); }));
-router.post('/:id/archive', workspaceAccess, asyncHandler(async (req, res) => { req.workspace.isArchived = !!req.body.isArchived; await req.workspace.save(); res.json({ workspace: mapId(req.workspace) }); }));
-router.post('/:id/duplicate', workspaceAccess, asyncHandler(async (req, res) => { const w = await Workspace.create({ ...req.workspace.toObject(), _id: undefined, name: req.workspace.name + ' Copy', createdAt: undefined, updatedAt: undefined }); res.json({ workspace: mapId(w) }); }));
+router.post('/:id/archive', workspaceAccess, asyncHandler(async (req, res) => { req.workspace.isArchived = !!req.body.isArchived; await req.workspace.save(); const [workspace] = await attachWorkspaceCounts([req.workspace]); res.json({ workspace }); }));
+router.post('/:id/duplicate', workspaceAccess, asyncHandler(async (req, res) => { const w = await Workspace.create({ ...req.workspace.toObject(), _id: undefined, name: req.workspace.name + ' Copy', createdAt: undefined, updatedAt: undefined }); res.json({ workspace: mapWorkspace(w) }); }));
 router.patch('/:id/last-opened', workspaceAccess, asyncHandler(async (req, res) => { req.workspace.lastOpenedAt = new Date(); await req.workspace.save(); res.json({ success: true }); }));
 router.get('/:workspaceId/uploads', workspaceAccess, asyncHandler(async (req, res) => { const uploads = (await CsvFile.find({ workspaceId: req.workspace._id }).sort({ createdAt: -1 })).map(mapId); res.json({ uploads, total: uploads.length }); }));
 function cleanPercent(value, fallback) { const n = Number(value); return Number.isFinite(n) && n >= 0 ? String(n) : String(fallback); }
@@ -191,7 +270,21 @@ router.post(
     });
   })
 );
-async function latestReport(workspaceId, userId) { let r = await Report.findOne({ workspaceId }).sort({ generatedAt: -1 }); if (!r) { const trades = await Trade.find({ workspaceId }).sort({ executedAt: 1 }); const settings = await ExchangeSetting.find({ workspaceId }); const settingsMap = {}; settings.forEach(s => settingsMap[s.exchangeName] = { buyFeePercent: s.buyFeePercent, sellFeePercent: s.sellFeePercent }); r = await Report.create({ userId, workspaceId, ...runFifo(trades, settingsMap) }); } return r; }
+function normalizeReportPayload(report) {
+  const plain = report?.toObject ? report.toObject() : report;
+  const openHoldings = normalizeOpenHoldings(plain?.openHoldings || []);
+  const summary = {
+    ...(plain?.summary || {}),
+    openHoldings: openHoldings.length,
+  };
+
+  return {
+    ...plain,
+    openHoldings,
+    summary,
+  };
+}
+async function latestReport(workspaceId, userId) { let r = await Report.findOne({ workspaceId }).sort({ generatedAt: -1 }); if (!r) { const trades = await Trade.find({ workspaceId }).sort({ executedAt: 1 }); const settings = await ExchangeSetting.find({ workspaceId }); const settingsMap = {}; settings.forEach(s => settingsMap[s.exchangeName] = { buyFeePercent: s.buyFeePercent, sellFeePercent: s.sellFeePercent }); r = await Report.create({ userId, workspaceId, ...runFifo(trades, settingsMap) }); } return normalizeReportPayload(r); }
 router.get('/:workspaceId/report', workspaceAccess, asyncHandler(async (req, res) => res.json(await latestReport(req.workspace._id, req.user._id))));
 router.get('/:workspaceId/realized-trades', workspaceAccess, asyncHandler(async (req, res) => { const r = await latestReport(req.workspace._id, req.user._id); let trades = r.realizedTrades || []; if (req.query.search) trades = trades.filter(t => String(t.pair).includes(String(req.query.search).toUpperCase())); res.json({ trades, total: trades.length }); }));
 router.get('/:workspaceId/open-holdings', workspaceAccess, asyncHandler(async (req, res) => { const r = await latestReport(req.workspace._id, req.user._id); res.json({ holdings: r.openHoldings || [] }); }));

@@ -28,13 +28,12 @@ import {
   Info,
   Search,
   Upload,
-  TrendingUp,
-  TrendingDown,
   Minus,
   Package,
   IndianRupee,
   BarChart3,
   AlertCircle,
+  X,
 } from 'lucide-react'
 
 interface Holding {
@@ -43,6 +42,46 @@ interface Holding {
   avgBuyPrice: string
   totalBuyValue: string
   sourceCount: number
+  exchangeName?: string
+}
+
+function toNumber(value: unknown): number {
+  const num = Number(value ?? 0)
+  return Number.isFinite(num) ? num : 0
+}
+
+function normalizeHolding(raw: any): Holding | null {
+  const pair = String(raw?.pair || '').trim().toUpperCase()
+  const remainingQty = toNumber(raw?.remainingQty ?? raw?.quantity)
+
+  if (!pair || remainingQty <= 0) return null
+
+  const totalBuyValue = toNumber(raw?.totalBuyValue ?? raw?.investedValue)
+  const avgBuyPriceRaw = toNumber(
+    raw?.avgBuyPrice ??
+    raw?.averageBuyPrice ??
+    raw?.buyPrice
+  )
+  const avgBuyPrice =
+    avgBuyPriceRaw > 0
+      ? avgBuyPriceRaw
+      : remainingQty > 0
+        ? totalBuyValue / remainingQty
+        : 0
+
+  const sourceCount =
+    Number(raw?.sourceCount) ||
+    (Array.isArray(raw?.sourceLots) ? raw.sourceLots.length : 0) ||
+    1
+
+  return {
+    pair,
+    remainingQty: String(remainingQty),
+    avgBuyPrice: String(avgBuyPrice),
+    totalBuyValue: String(totalBuyValue),
+    sourceCount,
+    exchangeName: String(raw?.exchangeName || raw?.exchange || '').trim() || undefined,
+  }
 }
 
 export function OpenHoldingsView() {
@@ -54,12 +93,22 @@ export function OpenHoldingsView() {
   const [searchQuery, setSearchQuery] = useState('')
 
   const fetchHoldings = useCallback(async () => {
-    if (!activeWorkspace?.id) return
+    if (!activeWorkspace?.id) {
+      setHoldings([])
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     try {
       const result = await reportApi.getOpenHoldings(activeWorkspace.id)
-      const list = (result as any).holdings ?? []
-      setHoldings(list)
+      const list = ((result as any).holdings ?? [])
+        .map(normalizeHolding)
+        .filter(Boolean) as Holding[]
+      setHoldings(
+        list.sort(
+          (a, b) => toNumber(b.totalBuyValue) - toNumber(a.totalBuyValue)
+        )
+      )
     } catch (err: any) {
       toast.error(err.message || 'Failed to load holdings')
       setHoldings([])
@@ -77,7 +126,8 @@ export function OpenHoldingsView() {
     if (!searchQuery.trim()) return holdings
     const q = searchQuery.toLowerCase()
     return holdings.filter((h) =>
-      h.pair.toLowerCase().includes(q)
+      h.pair.toLowerCase().includes(q) ||
+      h.exchangeName?.toLowerCase().includes(q)
     )
   }, [holdings, searchQuery])
 
@@ -138,12 +188,12 @@ export function OpenHoldingsView() {
 
   // ─── Render ──────────────────────────────────────────
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Info banner */}
       <InfoBanner />
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 gap-2.5 lg:gap-3">
+      <div className="grid gap-3 md:grid-cols-3">
         <StatCard
           icon={<Package className="h-4 w-4 text-teal-600 dark:text-teal-400" />}
           iconBg="bg-teal-500/10"
@@ -154,7 +204,7 @@ export function OpenHoldingsView() {
         <StatCard
           icon={<IndianRupee className="h-4 w-4 text-orange-600 dark:text-orange-400" />}
           iconBg="bg-orange-500/10"
-          label="Invested"
+          label="Cost Basis"
           value={formatINR(totalValue)}
         />
         <StatCard
@@ -162,19 +212,30 @@ export function OpenHoldingsView() {
           iconBg="bg-violet-500/10"
           label="Buy Lots"
           value={String(totalLots)}
-          className="hidden sm:block"
         />
       </div>
 
       {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by pair name..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 h-9 rounded-xl bg-muted/50 border-border/50"
-        />
+      <div className="rounded-2xl border border-border/50 bg-card/60 p-3">
+        <div className="relative w-full sm:max-w-lg">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by pair or exchange..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-10 rounded-xl border-border/50 bg-muted/40 pl-9 pr-9"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filtered empty state */}
@@ -189,22 +250,26 @@ export function OpenHoldingsView() {
 
       {/* Holdings count */}
       {filteredHoldings.length > 0 && (
-        <div className="text-sm text-muted-foreground">
-          {filteredHoldings.length} open position{filteredHoldings.length !== 1 ? 's' : ''} &middot;{' '}
-          {totalLots} buy lot{totalLots !== 1 ? 's' : ''}
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <span className="rounded-full bg-muted/50 px-3 py-1">
+            {filteredHoldings.length} open position{filteredHoldings.length !== 1 ? 's' : ''}
+          </span>
+          <span className="rounded-full bg-muted/50 px-3 py-1">
+            {totalLots} buy lot{totalLots !== 1 ? 's' : ''}
+          </span>
         </div>
       )}
 
       {/* Mobile: Card grid */}
       {!isMobile && filteredHoldings.length > 0 && (
-        <Card className="p-0 overflow-hidden">
+        <Card className="overflow-hidden border-border/50 bg-card/70 p-0">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead>Pair</TableHead>
                 <TableHead className="text-right">Remaining Quantity</TableHead>
                 <TableHead className="text-right">Avg Buy Price</TableHead>
-                <TableHead className="text-right">Invested Value</TableHead>
+                <TableHead className="text-right">Cost Basis</TableHead>
                 <TableHead className="text-right">Est. P&L</TableHead>
                 <TableHead className="text-right">Lots</TableHead>
               </TableRow>
@@ -213,12 +278,17 @@ export function OpenHoldingsView() {
               {filteredHoldings.map((holding, idx) => (
                 <TableRow key={`${holding.pair}-${idx}`}>
                   <TableCell>
-                    <Badge
-                      variant="secondary"
-                      className="bg-teal-500/10 text-teal-700 dark:text-teal-400 font-semibold"
-                    >
-                      {holding.pair}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="secondary"
+                        className="bg-teal-500/10 text-teal-700 dark:text-teal-400 font-semibold"
+                      >
+                        {holding.pair}
+                      </Badge>
+                      {holding.exchangeName && (
+                        <span className="text-xs text-muted-foreground">{holding.exchangeName}</span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">
                     {formatQuantity(holding.remainingQty)}
@@ -275,11 +345,11 @@ export function OpenHoldingsView() {
 
       {/* P&L Disclaimer */}
       {filteredHoldings.length > 0 && (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200/60 bg-amber-50/50 p-3 text-sm dark:border-amber-800/30 dark:bg-amber-950/20">
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200/60 bg-amber-50/50 p-4 text-sm dark:border-amber-800/30 dark:bg-amber-950/20">
           <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
           <p className="text-muted-foreground leading-relaxed">
             <span className="font-medium text-foreground">Real-time price data not available.</span>{' '}
-            P&L estimation requires live market prices. The &quot;Invested Value&quot; column shows
+            P&L estimation requires live market prices. The &quot;Cost Basis&quot; column shows
             your cost basis (avg buy price &times; quantity).
           </p>
         </div>
@@ -290,7 +360,7 @@ export function OpenHoldingsView() {
         <Card className="border-orange-500/30 bg-gradient-to-r from-orange-500/5 to-teal-500/5">
           <CardContent className="flex items-center justify-between p-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/10">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-500/10">
                 <Wallet className="h-5 w-5 text-orange-600 dark:text-orange-400" />
               </div>
               <div>
@@ -338,11 +408,11 @@ function StatCard({
     <Card className={className}>
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconBg}`}>
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconBg}`}>
             {icon}
           </div>
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
             <p className="text-lg font-bold font-mono text-foreground truncate">{value}</p>
             {sublabel && (
               <p className="text-[11px] text-muted-foreground">{sublabel}</p>
@@ -381,20 +451,25 @@ function HoldingCardEnhanced({ holding }: { holding: Holding }) {
 
   return (
     <Card
-      className="overflow-hidden transition-all duration-200 hover:shadow-lg hover:shadow-teal-500/5 hover:scale-[1.01]"
+      className="overflow-hidden border-border/50 bg-card/70 transition-all duration-200 hover:scale-[1.01] hover:shadow-lg hover:shadow-teal-500/5"
       style={{ borderLeftWidth: '4px', borderLeftColor: accentColor }}
     >
       <CardContent className="p-4">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <Badge
-            variant="secondary"
-            className="bg-teal-500/10 text-teal-700 dark:text-teal-400 font-semibold text-xs"
-          >
-            {holding.pair}
-          </Badge>
+          <div className="space-y-1">
+            <Badge
+              variant="secondary"
+              className="bg-teal-500/10 text-teal-700 dark:text-teal-400 font-semibold text-xs"
+            >
+              {holding.pair}
+            </Badge>
+            {holding.exchangeName && (
+              <p className="text-[11px] text-muted-foreground">{holding.exchangeName}</p>
+            )}
+          </div>
           {holding.sourceCount > 0 && (
-            <span className="text-xs text-muted-foreground">
+            <span className="rounded-full bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
               {holding.sourceCount} lot{Number(holding.sourceCount) > 1 ? 's' : ''}
             </span>
           )}
@@ -417,7 +492,7 @@ function HoldingCardEnhanced({ holding }: { holding: Holding }) {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-xs text-muted-foreground">Invested Value</div>
+            <div className="text-xs text-muted-foreground">Cost Basis</div>
             <div className="text-sm font-bold font-mono" style={{ color: accentColor }}>
               {formatINR(holding.totalBuyValue)}
             </div>
@@ -451,7 +526,7 @@ function EmptyState() {
         animate={{ y: [0, -6, 0] }}
         transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
       >
-        <div className="flex size-24 items-center justify-center rounded-3xl bg-muted/30 backdrop-blur-sm border border-border/30">
+      <div className="flex size-24 items-center justify-center rounded-3xl border border-border/30 bg-muted/30 backdrop-blur-sm">
           <Wallet className="size-12 text-teal-600/60 dark:text-teal-400/60" />
         </div>
         <motion.div
@@ -485,7 +560,7 @@ function EmptyState() {
 
 function InfoBanner() {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-teal-500/20 bg-teal-500/5 p-3 text-sm">
+    <div className="flex items-start gap-3 rounded-2xl border border-teal-500/20 bg-teal-500/5 p-4 text-sm">
       <Info className="mt-0.5 size-4 shrink-0 text-teal-600 dark:text-teal-400" />
       <p className="text-muted-foreground leading-relaxed">
         These are <span className="font-medium text-foreground">unmatched buy positions</span>{' '}

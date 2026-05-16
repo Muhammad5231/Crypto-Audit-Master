@@ -52,6 +52,32 @@ interface ReportData {
   generatedAt: string;
 }
 
+function safeNumber(value: unknown): number {
+  const num = Number(value ?? 0);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function normalizeReportData(input: any): ReportData | null {
+  if (!input) return null;
+
+  const summary = input.summary || input;
+
+  return {
+    totalGrossProfit: String(summary.grossProfit ?? summary.totalGrossProfit ?? 0),
+    totalFees: String(summary.totalFees ?? summary.fees ?? 0),
+    totalGst: String(summary.gstOnFees ?? summary.gst ?? summary.totalGst ?? 0),
+    totalTds: String(summary.tds ?? summary.totalTds ?? 0),
+    totalBaseTax: String(summary.baseCryptoTax ?? summary.tax ?? summary.totalBaseTax ?? 0),
+    totalCess: String(summary.cess ?? summary.totalCess ?? 0),
+    totalDirectTax: String(summary.totalDirectTax ?? summary.totalTax ?? 0),
+    totalNetProfit: String(
+      summary.netProfitInHand ?? summary.netProfit ?? summary.totalNetProfit ?? 0
+    ),
+    totalFinalNet: String(summary.finalNetProfit ?? summary.totalFinalNet ?? 0),
+    generatedAt: String(input.generatedAt || new Date().toISOString()),
+  };
+}
+
 // ── Tax Stacked Bar Colors ─────────────────────────────────────────────
 const TAX_BAR_COLORS: Record<string, string> = {
   'Base Tax': '#0d9488',
@@ -127,7 +153,7 @@ export function TaxSummaryView() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const workspaceId = activeWorkspace?.id;
+  const workspaceId = activeWorkspace?.id || (activeWorkspace as any)?._id;
 
   const fetchReport = useCallback(async () => {
     if (!workspaceId) {
@@ -142,7 +168,7 @@ export function TaxSummaryView() {
     try {
       const result = await reportApi.getReport(workspaceId);
       const r = result.report || result;
-      setReport(r);
+      setReport(normalizeReportData(r));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load report';
       if (message.includes('404') || message.toLowerCase().includes('no completed report')) {
@@ -163,15 +189,15 @@ export function TaxSummaryView() {
   const hasData = report !== null;
 
   // Derived calculations
-  const grossProfit = report ? parseFloat(report.totalGrossProfit) : 0;
-  const fees = report ? parseFloat(report.totalFees) : 0;
-  const gstOnFees = report ? parseFloat(report.totalGst) : 0;
-  const tds = report ? parseFloat(report.totalTds) : 0;
-  const baseTax = report ? parseFloat(report.totalBaseTax) : 0;
-  const cess = report ? parseFloat(report.totalCess) : 0;
-  const totalDirectTax = report ? parseFloat(report.totalDirectTax) : 0;
-  const netProfit = report ? parseFloat(report.totalNetProfit) : 0;
-  const finalNet = report ? parseFloat(report.totalFinalNet) : 0;
+  const grossProfit = report ? safeNumber(report.totalGrossProfit) : 0;
+  const fees = report ? safeNumber(report.totalFees) : 0;
+  const gstOnFees = report ? safeNumber(report.totalGst) : 0;
+  const tds = report ? safeNumber(report.totalTds) : 0;
+  const baseTax = report ? safeNumber(report.totalBaseTax) : 0;
+  const cess = report ? safeNumber(report.totalCess) : 0;
+  const totalDirectTax = report ? safeNumber(report.totalDirectTax) : 0;
+  const netProfit = report ? safeNumber(report.totalNetProfit) : 0;
+  const finalNet = report ? safeNumber(report.totalFinalNet) : 0;
 
   // Tax breakdown bar data
   const taxBreakdownData = hasData

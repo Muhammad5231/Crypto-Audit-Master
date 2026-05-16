@@ -148,7 +148,7 @@ export function WorkspacesView() {
       return (
         ws.name.toLowerCase().includes(q) ||
         (ws.description || '').toLowerCase().includes(q) ||
-        ws.financialYear.toLowerCase().includes(q)
+        (ws.financialYear || '').toLowerCase().includes(q)
       )
     }
     return true
@@ -156,6 +156,11 @@ export function WorkspacesView() {
 
   const activeWorkspaces = filteredWorkspaces.filter((ws) => !ws.isArchived)
   const archivedWorkspaces = filteredWorkspaces.filter((ws) => ws.isArchived)
+  const workspaceSummary = {
+    active: (workspaces ?? []).filter((ws) => !ws.isArchived).length,
+    archived: (workspaces ?? []).filter((ws) => ws.isArchived).length,
+    visible: filteredWorkspaces.length,
+  }
 
   // ─── Create ─────────────────────────────────────
   const handleCreate = async () => {
@@ -345,15 +350,28 @@ export function WorkspacesView() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search workspaces..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 h-9 rounded-xl bg-muted/50 border-border/50"
-        />
+      {/* Search + Summary */}
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="relative w-full sm:max-w-lg">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search workspaces..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-10 rounded-xl border-border/50 bg-muted/50 pl-9"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="secondary" className="rounded-full px-3 py-1 font-normal">
+            {workspaceSummary.active} active
+          </Badge>
+          <Badge variant="secondary" className="rounded-full px-3 py-1 font-normal">
+            {workspaceSummary.archived} archived
+          </Badge>
+          <Badge variant="secondary" className="rounded-full px-3 py-1 font-normal">
+            {workspaceSummary.visible} visible
+          </Badge>
+        </div>
       </div>
 
       {/* Workspace Grid */}
@@ -391,7 +409,7 @@ export function WorkspacesView() {
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                 Active Workspaces ({activeWorkspaces.length})
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
                 {activeWorkspaces.map((ws, idx) => (
                   <WorkspaceCard
                     key={ws.id}
@@ -416,7 +434,7 @@ export function WorkspacesView() {
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 mt-8">
                 Archived Workspaces ({archivedWorkspaces.length})
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
                 {archivedWorkspaces.map((ws, idx) => (
                   <WorkspaceCard
                     key={ws.id}
