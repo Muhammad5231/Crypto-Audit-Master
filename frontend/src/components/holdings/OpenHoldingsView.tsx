@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useAppStore } from '@/store/appStore'
@@ -57,11 +57,7 @@ function normalizeHolding(raw: any): Holding | null {
   if (!pair || remainingQty <= 0) return null
 
   const totalBuyValue = toNumber(raw?.totalBuyValue ?? raw?.investedValue)
-  const avgBuyPriceRaw = toNumber(
-    raw?.avgBuyPrice ??
-    raw?.averageBuyPrice ??
-    raw?.buyPrice
-  )
+  const avgBuyPriceRaw = toNumber(raw?.avgBuyPrice ?? raw?.averageBuyPrice ?? raw?.buyPrice)
   const avgBuyPrice =
     avgBuyPriceRaw > 0
       ? avgBuyPriceRaw
@@ -98,16 +94,16 @@ export function OpenHoldingsView() {
       setIsLoading(false)
       return
     }
+
     setIsLoading(true)
     try {
       const result = await reportApi.getOpenHoldings(activeWorkspace.id)
       const list = ((result as any).holdings ?? [])
         .map(normalizeHolding)
         .filter(Boolean) as Holding[]
+
       setHoldings(
-        list.sort(
-          (a, b) => toNumber(b.totalBuyValue) - toNumber(a.totalBuyValue)
-        )
+        list.sort((a, b) => toNumber(b.totalBuyValue) - toNumber(a.totalBuyValue))
       )
     } catch (err: any) {
       toast.error(err.message || 'Failed to load holdings')
@@ -121,54 +117,47 @@ export function OpenHoldingsView() {
     fetchHoldings()
   }, [fetchHoldings])
 
-  // Filter holdings by search query
   const filteredHoldings = useMemo(() => {
     if (!searchQuery.trim()) return holdings
-    const q = searchQuery.toLowerCase()
-    return holdings.filter((h) =>
-      h.pair.toLowerCase().includes(q) ||
-      h.exchangeName?.toLowerCase().includes(q)
+    const query = searchQuery.toLowerCase()
+    return holdings.filter(
+      (holding) =>
+        holding.pair.toLowerCase().includes(query) ||
+        holding.exchangeName?.toLowerCase().includes(query)
     )
   }, [holdings, searchQuery])
 
-  // Total portfolio value
-  const totalValue = useMemo(() => {
-    return filteredHoldings.reduce(
-      (sum, h) => sum + (parseFloat(h.totalBuyValue) || 0),
-      0
-    )
-  }, [filteredHoldings])
+  const totalValue = useMemo(
+    () => filteredHoldings.reduce((sum, holding) => sum + toNumber(holding.totalBuyValue), 0),
+    [filteredHoldings]
+  )
 
-  // Total source count (all lots)
-  const totalLots = useMemo(() => {
-    return filteredHoldings.reduce(
-      (sum, h) => sum + (Number(h.sourceCount) || 0),
-      0
-    )
-  }, [filteredHoldings])
+  const totalLots = useMemo(
+    () => filteredHoldings.reduce((sum, holding) => sum + (Number(holding.sourceCount) || 0), 0),
+    [filteredHoldings]
+  )
 
-  // ─── Loading skeleton ────────────────────────────────
   if (isLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-14 w-full rounded-lg" />
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-24 w-full rounded-2xl" />
           ))}
         </div>
         <Skeleton className="h-10 w-full max-w-sm rounded-xl" />
         {isMobile ? (
           <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-36 w-full rounded-xl" />
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-36 w-full rounded-xl" />
             ))}
           </div>
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-10 w-full" />
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Skeleton key={index} className="h-12 w-full" />
             ))}
           </div>
         )}
@@ -176,7 +165,6 @@ export function OpenHoldingsView() {
     )
   }
 
-  // ─── Empty state ─────────────────────────────────────
   if (holdings.length === 0) {
     return (
       <div className="space-y-4">
@@ -186,13 +174,10 @@ export function OpenHoldingsView() {
     )
   }
 
-  // ─── Render ──────────────────────────────────────────
   return (
     <div className="space-y-5">
-      {/* Info banner */}
       <InfoBanner />
 
-      {/* Summary Stats */}
       <div className="grid gap-3 md:grid-cols-3">
         <StatCard
           icon={<Package className="h-4 w-4 text-teal-600 dark:text-teal-400" />}
@@ -215,14 +200,13 @@ export function OpenHoldingsView() {
         />
       </div>
 
-      {/* Search */}
       <div className="rounded-2xl border border-border/50 bg-card/60 p-3">
         <div className="relative w-full sm:max-w-lg">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search by pair or exchange..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(event) => setSearchQuery(event.target.value)}
             className="h-10 rounded-xl border-border/50 bg-muted/40 pl-9 pr-9"
           />
           {searchQuery && (
@@ -238,17 +222,15 @@ export function OpenHoldingsView() {
         </div>
       </div>
 
-      {/* Filtered empty state */}
       {filteredHoldings.length === 0 && searchQuery.trim() && (
         <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Search className="h-10 w-10 text-muted-foreground/40 mb-3" />
+          <Search className="mb-3 h-10 w-10 text-muted-foreground/40" />
           <p className="text-sm text-muted-foreground">
             No holdings matching &quot;{searchQuery}&quot;
           </p>
         </div>
       )}
 
-      {/* Holdings count */}
       {filteredHoldings.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span className="rounded-full bg-muted/50 px-3 py-1">
@@ -260,7 +242,6 @@ export function OpenHoldingsView() {
         </div>
       )}
 
-      {/* Mobile: Card grid */}
       {!isMobile && filteredHoldings.length > 0 && (
         <Card className="overflow-hidden border-border/50 bg-card/70 p-0">
           <Table>
@@ -270,19 +251,16 @@ export function OpenHoldingsView() {
                 <TableHead className="text-right">Remaining Quantity</TableHead>
                 <TableHead className="text-right">Avg Buy Price</TableHead>
                 <TableHead className="text-right">Cost Basis</TableHead>
-                <TableHead className="text-right">Est. P&L</TableHead>
+                <TableHead className="text-right">Est. P&amp;L</TableHead>
                 <TableHead className="text-right">Lots</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredHoldings.map((holding, idx) => (
-                <TableRow key={`${holding.pair}-${idx}`}>
+              {filteredHoldings.map((holding, index) => (
+                <TableRow key={`${holding.pair}-${index}`}>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Badge
-                        variant="secondary"
-                        className="bg-teal-500/10 text-teal-700 dark:text-teal-400 font-semibold"
-                      >
+                      <Badge variant="secondary" className="bg-teal-500/10 font-semibold text-teal-700 dark:text-teal-400">
                         {holding.pair}
                       </Badge>
                       {holding.exchangeName && (
@@ -331,31 +309,25 @@ export function OpenHoldingsView() {
         </Card>
       )}
 
-      {/* Mobile: Card grid */}
       {isMobile && filteredHoldings.length > 0 && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {filteredHoldings.map((holding, idx) => (
-            <HoldingCardEnhanced
-              key={`${holding.pair}-${idx}`}
-              holding={holding}
-            />
+          {filteredHoldings.map((holding, index) => (
+            <HoldingCardEnhanced key={`${holding.pair}-${index}`} holding={holding} />
           ))}
         </div>
       )}
 
-      {/* P&L Disclaimer */}
       {filteredHoldings.length > 0 && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200/60 bg-amber-50/50 p-4 text-sm dark:border-amber-800/30 dark:bg-amber-950/20">
-          <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-          <p className="text-muted-foreground leading-relaxed">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <p className="leading-relaxed text-muted-foreground">
             <span className="font-medium text-foreground">Real-time price data not available.</span>{' '}
-            P&L estimation requires live market prices. The &quot;Cost Basis&quot; column shows
-            your cost basis (avg buy price &times; quantity).
+            P&amp;L estimation requires live market prices. The &quot;Cost Basis&quot; column shows your cost basis
+            (avg buy price × quantity).
           </p>
         </div>
       )}
 
-      {/* Portfolio Value Summary */}
       {filteredHoldings.length > 0 && (
         <Card className="border-orange-500/30 bg-gradient-to-r from-orange-500/5 to-teal-500/5">
           <CardContent className="flex items-center justify-between p-5">
@@ -364,21 +336,17 @@ export function OpenHoldingsView() {
                 <Wallet className="h-5 w-5 text-orange-600 dark:text-orange-400" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">
-                  Total Portfolio Cost Basis
-                </p>
+                <p className="text-sm text-muted-foreground">Total Portfolio Cost Basis</p>
                 <p className="text-xs text-muted-foreground">
-                  {filteredHoldings.length} position{filteredHoldings.length !== 1 ? 's' : ''} &middot; {totalLots} lots
+                  {filteredHoldings.length} position{filteredHoldings.length !== 1 ? 's' : ''} • {totalLots} lots
                 </p>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xl font-bold font-mono bg-gradient-to-r from-orange-600 to-orange-400 bg-clip-text text-transparent">
+              <div className="text-xl font-bold bg-gradient-to-r from-orange-600 to-orange-400 bg-clip-text text-transparent">
                 {formatINR(totalValue)}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Total invested value
-              </p>
+              <p className="text-xs text-muted-foreground">Total invested value</p>
             </div>
           </CardContent>
         </Card>
@@ -387,25 +355,21 @@ export function OpenHoldingsView() {
   )
 }
 
-// ─── Stat Card ────────────────────────────────────────
-
 function StatCard({
   icon,
   iconBg,
   label,
   value,
   sublabel,
-  className,
 }: {
-  icon: React.ReactNode
+  icon: ReactNode
   iconBg: string
   label: string
   value: string
   sublabel?: string
-  className?: string
 }) {
   return (
-    <Card className={className}>
+    <Card>
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconBg}`}>
@@ -413,18 +377,14 @@ function StatCard({
           </div>
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-            <p className="text-lg font-bold font-mono text-foreground truncate">{value}</p>
-            {sublabel && (
-              <p className="text-[11px] text-muted-foreground">{sublabel}</p>
-            )}
+            <p className="truncate text-lg font-bold text-foreground">{value}</p>
+            {sublabel && <p className="text-[11px] text-muted-foreground">{sublabel}</p>}
           </div>
         </div>
       </CardContent>
     </Card>
   )
 }
-
-// ─── P&L Cell ─────────────────────────────────────────
 
 function PLCell() {
   return (
@@ -435,15 +395,13 @@ function PLCell() {
   )
 }
 
-// ─── Enhanced Holding Card (Mobile) ────────────────────
-
 function HoldingCardEnhanced({ holding }: { holding: Holding }) {
-  const totalBuyValue = parseFloat(holding.totalBuyValue) || 0
+  const totalBuyValue = toNumber(holding.totalBuyValue)
 
-  function getAccentColor(val: number): string {
-    if (val >= 100000) return '#f97316'
-    if (val >= 10000) return '#14b8a6'
-    if (val > 0) return '#6b7280'
+  function getAccentColor(value: number): string {
+    if (value >= 100000) return '#f97316'
+    if (value >= 10000) return '#14b8a6'
+    if (value > 0) return '#6b7280'
     return '#d1d5db'
   }
 
@@ -455,13 +413,9 @@ function HoldingCardEnhanced({ holding }: { holding: Holding }) {
       style={{ borderLeftWidth: '4px', borderLeftColor: accentColor }}
     >
       <CardContent className="p-4">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <Badge
-              variant="secondary"
-              className="bg-teal-500/10 text-teal-700 dark:text-teal-400 font-semibold text-xs"
-            >
+            <Badge variant="secondary" className="bg-teal-500/10 text-xs font-semibold text-teal-700 dark:text-teal-400">
               {holding.pair}
             </Badge>
             {holding.exchangeName && (
@@ -475,7 +429,6 @@ function HoldingCardEnhanced({ holding }: { holding: Holding }) {
           )}
         </div>
 
-        {/* Remaining Quantity */}
         <div className="mt-3">
           <div className="text-xs text-muted-foreground">Remaining Quantity</div>
           <div className="text-lg font-bold font-mono text-foreground">
@@ -483,7 +436,6 @@ function HoldingCardEnhanced({ holding }: { holding: Holding }) {
           </div>
         </div>
 
-        {/* Details Row */}
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div>
             <div className="text-xs text-muted-foreground">Avg Buy Price</div>
@@ -499,10 +451,9 @@ function HoldingCardEnhanced({ holding }: { holding: Holding }) {
           </div>
         </div>
 
-        {/* P&L row */}
-        <div className="mt-3 pt-3 border-t border-border/50">
+        <div className="mt-3 border-t border-border/50 pt-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Est. P&L</span>
+            <span className="text-xs text-muted-foreground">Est. P&amp;L</span>
             <div className="flex items-center gap-1.5">
               <Minus className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">N/A</span>
@@ -514,8 +465,6 @@ function HoldingCardEnhanced({ holding }: { holding: Holding }) {
   )
 }
 
-// ─── Empty State ──────────────────────────────────────
-
 function EmptyState() {
   const setCurrentView = useAppStore((s) => s.setCurrentView)
 
@@ -524,48 +473,44 @@ function EmptyState() {
       <motion.div
         className="relative mb-6"
         animate={{ y: [0, -6, 0] }}
-        transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+        transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
       >
-      <div className="flex size-24 items-center justify-center rounded-3xl border border-border/30 bg-muted/30 backdrop-blur-sm">
+        <div className="flex size-24 items-center justify-center rounded-3xl border border-border/30 bg-muted/30 backdrop-blur-sm">
           <Wallet className="size-12 text-teal-600/60 dark:text-teal-400/60" />
         </div>
         <motion.div
           className="absolute -bottom-1 -right-1 flex size-8 items-center justify-center rounded-full bg-muted border border-border/30"
           animate={{ rotate: [0, 10, -10, 0] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
         >
           <FileX2 className="size-4 text-muted-foreground" />
         </motion.div>
       </motion.div>
 
-      <h3 className="text-lg font-semibold text-foreground mb-2">
-        No Open Holdings
-      </h3>
-      <p className="text-sm text-muted-foreground max-w-sm leading-relaxed mb-6">
-        After processing trades, your open (unmatched) holdings will appear here.
-        These represent crypto positions you still hold after FIFO matching.
+      <h3 className="mb-2 text-lg font-semibold text-foreground">No Open Holdings</h3>
+      <p className="mb-6 max-w-sm text-sm leading-relaxed text-muted-foreground">
+        After processing trades, your open (unmatched) holdings will appear here. These represent
+        crypto positions you still hold after FIFO matching.
       </p>
       <Button
         onClick={() => setCurrentView('upload')}
-        className="rounded-xl bg-teal-600 hover:bg-teal-700 text-white"
+        className="rounded-xl bg-teal-600 text-white hover:bg-teal-700"
       >
-        <Upload className="h-4 w-4 mr-2" />
+        <Upload className="mr-2 h-4 w-4" />
         Go to Upload
       </Button>
     </div>
   )
 }
 
-// ─── Info Banner ───────────────────────────────────────
-
 function InfoBanner() {
   return (
     <div className="flex items-start gap-3 rounded-2xl border border-teal-500/20 bg-teal-500/5 p-4 text-sm">
       <Info className="mt-0.5 size-4 shrink-0 text-teal-600 dark:text-teal-400" />
-      <p className="text-muted-foreground leading-relaxed">
+      <p className="leading-relaxed text-muted-foreground">
         These are <span className="font-medium text-foreground">unmatched buy positions</span>{' '}
-        remaining after FIFO matching. They represent your current open holdings that have
-        not yet been sold or matched against sell transactions.
+        remaining after FIFO matching. They represent your current open holdings that have not yet
+        been sold or matched against sell transactions.
       </p>
     </div>
   )

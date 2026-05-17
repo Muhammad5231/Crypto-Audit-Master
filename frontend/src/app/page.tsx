@@ -192,7 +192,7 @@ export default function Home() {
       </div>
 
       {/* Back to Top Button */}
-      <BackToTop />
+      {currentView !== "dashboard" ? <BackToTop /> : null}
 
       {/* Mobile Bottom Nav */}
       <MobileNav />
