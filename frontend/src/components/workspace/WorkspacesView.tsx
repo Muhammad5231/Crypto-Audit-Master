@@ -592,20 +592,24 @@ function WorkspaceCard({
               </div>
             </div>
 
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-8 w-8 shrink-0 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100"
+                  onClick={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  aria-label={`Open actions for ${workspace.name}`}
                 >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 rounded-xl">
+              <DropdownMenuContent align="end" sideOffset={8} className="z-[9999] w-44 rounded-xl">
                 {!isActive && (
                   <DropdownMenuItem
-                    onClick={onSwitch}
+                    onSelect={onSwitch}
                     className="rounded-lg cursor-pointer"
                   >
                     <Check className="h-4 w-4 mr-2" />
@@ -613,14 +617,14 @@ function WorkspaceCard({
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem
-                  onClick={onEdit}
+                  onSelect={onEdit}
                   className="rounded-lg cursor-pointer"
                 >
                   <Pencil className="h-4 w-4 mr-2" />
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={onDuplicate}
+                  onSelect={onDuplicate}
                   className="rounded-lg cursor-pointer"
                 >
                   <Copy className="h-4 w-4 mr-2" />
@@ -629,7 +633,7 @@ function WorkspaceCard({
                 <DropdownMenuSeparator />
                 {workspace.isArchived ? (
                   <DropdownMenuItem
-                    onClick={onArchive}
+                    onSelect={onArchive}
                     className="rounded-lg cursor-pointer"
                   >
                     <ArchiveRestore className="h-4 w-4 mr-2" />
@@ -637,7 +641,7 @@ function WorkspaceCard({
                   </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem
-                    onClick={onArchive}
+                    onSelect={onArchive}
                     className="rounded-lg cursor-pointer"
                   >
                     <Archive className="h-4 w-4 mr-2" />
@@ -646,7 +650,7 @@ function WorkspaceCard({
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={onDelete}
+                  onSelect={onDelete}
                   className="rounded-lg cursor-pointer text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />

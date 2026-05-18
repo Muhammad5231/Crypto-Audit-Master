@@ -18,7 +18,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { NAV_ITEMS } from '@/lib/constants/navItems';
+import { SIDEBAR_ITEMS } from '@/lib/constants/navItems';
 
 export function Sidebar() {
   const collapsed = useAppStore((s) => s.sidebarCollapsed);
@@ -103,7 +103,7 @@ export function Sidebar() {
       {/* Navigation */}
       <ScrollArea className="flex-1 px-2.5 py-2">
         <nav className="space-y-0.5">
-          {NAV_ITEMS.map((item) => {
+          {SIDEBAR_ITEMS.map((item) => {
             const isActive = currentView === item.view;
             const Icon = item.icon;
 

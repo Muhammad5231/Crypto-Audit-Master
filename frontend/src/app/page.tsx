@@ -108,16 +108,19 @@ export default function Home() {
 
   // App layout
   return (
-    <div className="h-screen flex bg-background overflow-hidden">
+    <div className="min-h-app flex bg-background overflow-hidden">
       {/* Desktop Sidebar */}
       <Sidebar />
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      <div className="min-h-app flex-1 flex flex-col overflow-hidden">
         <Topbar />
 
         {/* Scrollable content area */}
-        <main id="app-scroll-container" className="flex-1 overflow-y-auto px-3 py-3 lg:px-6 lg:py-4 pb-[100px] lg:pb-14">
+        <main
+          id="app-scroll-container"
+          className="flex-1 overflow-y-auto px-3 py-3 pb-mobile-nav lg:px-6 lg:py-4 lg:pb-14"
+        >
           <AnimatePresence mode="wait">
             {currentView === "dashboard" && (
               <PageTransition key="dashboard">
